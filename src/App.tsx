@@ -15,6 +15,8 @@ import ReactFlow, {
   Edge,
   NodeTypes,
   BackgroundVariant,
+  useReactFlow,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Upload, Search, Moon, Sun, User, Home, Car, FileText, X, ChevronRight, ChevronDown } from 'lucide-react';
@@ -106,31 +108,62 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
           </div>
         )}
         
+        {/* Dynamic handles for all sides */}
         <Handle 
           type="source" 
-          position={Position.Right} 
-          className="w-3 h-3 bg-white/90 border-2 border-current opacity-0 hover:opacity-100 transition-opacity" 
-          style={{ right: -6 }}
-        />
-        <Handle 
-          type="target" 
-          position={Position.Left} 
-          className="w-3 h-3 bg-white/90 border-2 border-current opacity-0 hover:opacity-100 transition-opacity" 
-          style={{ left: -6 }}
-        />
-        <Handle 
-          type="source" 
-          position={Position.Bottom} 
-          id="bottom"
-          className="w-3 h-3 bg-white/90 border-2 border-current opacity-0 hover:opacity-100 transition-opacity" 
-          style={{ bottom: -6 }}
-        />
-        <Handle 
-          type="target" 
-          position={Position.Top} 
+          position={Position.Top}
           id="top"
-          className="w-3 h-3 bg-white/90 border-2 border-current opacity-0 hover:opacity-100 transition-opacity" 
-          style={{ top: -6 }}
+          className="opacity-0" 
+          style={{ top: 0 }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Right}
+          id="right"
+          className="opacity-0" 
+          style={{ right: 0 }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Bottom}
+          id="bottom"
+          className="opacity-0" 
+          style={{ bottom: 0 }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Left}
+          id="left"
+          className="opacity-0" 
+          style={{ left: 0 }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Top}
+          id="target-top"
+          className="opacity-0" 
+          style={{ top: 0 }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Right}
+          id="target-right"
+          className="opacity-0" 
+          style={{ right: 0 }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Bottom}
+          id="target-bottom"
+          className="opacity-0" 
+          style={{ bottom: 0 }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Left}
+          id="target-left"
+          className="opacity-0" 
+          style={{ left: 0 }}
         />
       </div>
       
@@ -163,6 +196,10 @@ function DocumentGraphApp() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const reactFlowInstance = useReactFlow();
+  
+  // Store all nodes data
+  const [allNodesData, setAllNodesData] = useState<Node[]>([]);
   
   // Form state
   const [newNodeData, setNewNodeData] = useState<Partial<NodeData>>({
@@ -243,6 +280,21 @@ function DocumentGraphApp() {
     return layoutNodes;
   };
   
+  // Get all descendant IDs recursively
+  const getAllDescendantIds = (nodeId: string, allNodes: Node[]): string[] => {
+    const descendants: string[] = [];
+    const children = allNodes.filter(n => 
+      (n.data as NodeData).parentIds?.includes(nodeId)
+    );
+    
+    children.forEach(child => {
+      descendants.push(child.id);
+      descendants.push(...getAllDescendantIds(child.id, allNodes));
+    });
+    
+    return descendants;
+  };
+  
   // Handle node click to expand/collapse
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const nodeData = node.data as NodeData;
@@ -250,20 +302,46 @@ function DocumentGraphApp() {
       setExpandedNodes(prev => {
         const newSet = new Set(prev);
         if (newSet.has(node.id)) {
+          // Collapsing: remove this node and all descendants
           newSet.delete(node.id);
+          const descendants = getAllDescendantIds(node.id, allNodesData);
+          descendants.forEach(id => newSet.delete(id));
+          
+          // Focus on the collapsed node
+          setTimeout(() => {
+            reactFlowInstance.fitView({
+              nodes: [{ id: node.id }],
+              duration: 800,
+              padding: 2,
+            });
+          }, 100);
         } else {
+          // Expanding: add this node
           newSet.add(node.id);
+          
+          // Focus on expanded area
+          setTimeout(() => {
+            const children = allNodesData.filter(n => 
+              (n.data as NodeData).parentIds?.includes(node.id)
+            );
+            const nodesToFit = [node, ...children];
+            reactFlowInstance.fitView({
+              nodes: nodesToFit,
+              duration: 800,
+              padding: 0.5,
+            });
+          }, 100);
         }
         return newSet;
       });
     }
-  }, []);
+  }, [allNodesData, reactFlowInstance]);
   
   const onConnect = useCallback(
     (params: Connection) => {
       const edge = {
         ...params,
-        type: 'bezier',
+        type: 'smoothstep',
         animated: true,
         style: {
           strokeWidth: 2,
@@ -486,27 +564,28 @@ function DocumentGraphApp() {
     ];
     
     const layoutedNodes = autoLayout(allNodes);
+    setAllNodesData(layoutedNodes);
     setNodes(layoutedNodes);
     
     // Create edges
     const sampleEdges: Edge[] = [
       // Level 1 to Level 2
-      { id: 'brett-home', source: 'brett', target: 'home', type: 'bezier', animated: true },
-      { id: 'gemma-home', source: 'gemma', target: 'home', type: 'bezier', animated: true },
-      { id: 'brett-docs', source: 'brett', target: 'family-docs', type: 'bezier', animated: true },
-      { id: 'gemma-docs', source: 'gemma', target: 'family-docs', type: 'bezier', animated: true },
+      { id: 'brett-home', source: 'brett', target: 'home', type: 'smoothstep', animated: true },
+      { id: 'gemma-home', source: 'gemma', target: 'home', type: 'smoothstep', animated: true },
+      { id: 'brett-docs', source: 'brett', target: 'family-docs', type: 'smoothstep', animated: true },
+      { id: 'gemma-docs', source: 'gemma', target: 'family-docs', type: 'smoothstep', animated: true },
       
       // Level 2 to Level 3
-      { id: 'home-insurance', source: 'home', target: 'insurance', type: 'bezier', animated: true },
-      { id: 'home-cleaner', source: 'home', target: 'cleaner', type: 'bezier', animated: true },
-      { id: 'home-gardener', source: 'home', target: 'gardener', type: 'bezier', animated: true },
-      { id: 'docs-passports', source: 'family-docs', target: 'passports', type: 'bezier', animated: true },
-      { id: 'docs-medicare', source: 'family-docs', target: 'medicare', type: 'bezier', animated: true },
-      { id: 'docs-health', source: 'family-docs', target: 'health-insurance', type: 'bezier', animated: true },
+      { id: 'home-insurance', source: 'home', target: 'insurance', type: 'smoothstep', animated: true },
+      { id: 'home-cleaner', source: 'home', target: 'cleaner', type: 'smoothstep', animated: true },
+      { id: 'home-gardener', source: 'home', target: 'gardener', type: 'smoothstep', animated: true },
+      { id: 'docs-passports', source: 'family-docs', target: 'passports', type: 'smoothstep', animated: true },
+      { id: 'docs-medicare', source: 'family-docs', target: 'medicare', type: 'smoothstep', animated: true },
+      { id: 'docs-health', source: 'family-docs', target: 'health-insurance', type: 'smoothstep', animated: true },
       
       // Level 3 to Level 4
-      { id: 'passports-brett', source: 'passports', target: 'brett-passport', type: 'bezier', animated: true },
-      { id: 'passports-gemma', source: 'passports', target: 'gemma-passport', type: 'bezier', animated: true },
+      { id: 'passports-brett', source: 'passports', target: 'brett-passport', type: 'smoothstep', animated: true },
+      { id: 'passports-gemma', source: 'passports', target: 'gemma-passport', type: 'smoothstep', animated: true },
     ];
     
     setEdges(sampleEdges);
@@ -524,15 +603,29 @@ function DocumentGraphApp() {
   }, [expandedNodes, setNodes]);
   
   // Filter nodes based on expansion state
-  const visibleNodes = nodes.filter(node => {
+  const visibleNodes = allNodesData.filter(node => {
     const nodeData = node.data as NodeData;
     
     // Always show level 1 and 2
     if (nodeData.level === 1 || nodeData.level === 2) return true;
     
-    // Show other nodes only if their parent is expanded
+    // For other nodes, check if ALL parent nodes in the chain are expanded
     if (nodeData.parentIds) {
-      return nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
+      // Check immediate parent first
+      const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
+      if (!immediateParentExpanded) return false;
+      
+      // For level 4 nodes, also check if grandparent is expanded
+      if (nodeData.level === 4) {
+        const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
+        if (parent) {
+          const grandParentIds = (parent.data as NodeData).parentIds || [];
+          const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
+          if (!grandParentExpanded) return false;
+        }
+      }
+      
+      return true;
     }
     
     return false;
@@ -559,87 +652,86 @@ function DocumentGraphApp() {
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
       <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100">
-        <ReactFlowProvider>
-          <ReactFlow
-            nodes={searchQuery ? filteredNodes : visibleNodes}
-            edges={searchQuery ? filteredEdges : visibleEdges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            nodeTypes={nodeTypes}
-            fitView
-            className="bg-transparent"
-          >
-            <Background 
-              color={darkMode ? '#374151' : '#e5e7eb'} 
-              gap={16} 
-              variant={BackgroundVariant.Dots}
-              size={1}
-            />
-            <Controls />
-            <MiniMap 
-              nodeColor={(node) => {
-                const data = node.data as NodeData;
-                switch (data?.type) {
-                  case 'person':
-                  case 'pet':
-                    return '#3B82F6';
-                  case 'asset':
-                    return '#10B981';
-                  case 'document':
-                    return '#8B5CF6';
-                  default:
-                    return '#6B7280';
-                }
-              }}
-              className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg"
-            />
-            
-            <Panel position="top-left" className="flex gap-2">
-              <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center gap-2">
-                <Search className="w-5 h-5 text-gray-500" />
-                <input
-                  type="text"
-                  placeholder="Search nodes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent outline-none w-48 text-sm"
-                />
-              </div>
-              
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-colors shadow-lg"
-              >
-                <Upload className="w-5 h-5" />
-                Add Node
-              </button>
-              
+        <ReactFlow
+          nodes={searchQuery ? filteredNodes : visibleNodes}
+          edges={searchQuery ? filteredEdges : visibleEdges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          nodeTypes={nodeTypes}
+          fitView
+          className="bg-transparent"
+          connectionMode={ConnectionMode.Loose}
+        >
+          <Background 
+            color={darkMode ? '#374151' : '#e5e7eb'} 
+            gap={16} 
+            variant={BackgroundVariant.Dots}
+            size={1}
+          />
+          <Controls />
+          <MiniMap 
+            nodeColor={(node) => {
+              const data = node.data as NodeData;
+              switch (data?.type) {
+                case 'person':
+                case 'pet':
+                  return '#3B82F6';
+                case 'asset':
+                  return '#10B981';
+                case 'document':
+                  return '#8B5CF6';
+                default:
+                  return '#6B7280';
+              }
+            }}
+            className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg"
+          />
+          
+          <Panel position="top-left" className="flex gap-2">
+            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center gap-2">
+              <Search className="w-5 h-5 text-gray-500" />
               <input
-                ref={fileInputRef}
-                type="file"
-                onChange={handleFileUpload}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                type="text"
+                placeholder="Search nodes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-transparent outline-none w-48 text-sm"
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-purple-500 hover:bg-purple-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-colors shadow-lg"
-              >
-                <FileText className="w-5 h-5" />
-                Upload Document
-              </button>
-              
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="bg-gray-200 dark:bg-gray-700 rounded-lg p-2 transition-colors shadow-lg"
-              >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-            </Panel>
-          </ReactFlow>
-        </ReactFlowProvider>
+            </div>
+            
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-colors shadow-lg"
+            >
+              <Upload className="w-5 h-5" />
+              Add Node
+            </button>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-purple-500 hover:bg-purple-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-colors shadow-lg"
+            >
+              <FileText className="w-5 h-5" />
+              Upload Document
+            </button>
+            
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="bg-gray-200 dark:bg-gray-700 rounded-lg p-2 transition-colors shadow-lg"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+          </Panel>
+        </ReactFlow>
         
         {/* Add Node Modal */}
         {showAddModal && (
@@ -721,5 +813,9 @@ function DocumentGraphApp() {
 }
 
 export default function App() {
-  return <DocumentGraphApp />;
+  return (
+    <ReactFlowProvider>
+      <DocumentGraphApp />
+    </ReactFlowProvider>
+  );
 }
