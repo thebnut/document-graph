@@ -188,7 +188,8 @@ const nodeTypes: NodeTypes = {
   entity: EntityNode,
 };
 
-function DocumentGraphApp() {
+// Inner component that uses ReactFlow hooks
+function DocumentGraphInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [darkMode, setDarkMode] = useState(false);
@@ -213,8 +214,6 @@ function DocumentGraphApp() {
     const centerX = 400;
     const centerY = 300;
     const level2Radius = 200;
-    const level3Radius = 350;
-    const level4Radius = 500;
     
     const layoutNodes = [...nodes];
     
@@ -260,7 +259,7 @@ function DocumentGraphApp() {
     
     // Position level 4 nodes
     const level4Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 4);
-    level4Nodes.forEach((node, index) => {
+    level4Nodes.forEach((node) => {
       const parentId = (node.data as NodeData).parentIds?.[0];
       const parent = layoutNodes.find(n => n.id === parentId);
       if (parent) {
@@ -281,7 +280,7 @@ function DocumentGraphApp() {
   };
   
   // Get all descendant IDs recursively
-  const getAllDescendantIds = (nodeId: string, allNodes: Node[]): string[] => {
+  const getAllDescendantIds = useCallback((nodeId: string, allNodes: Node[]): string[] => {
     const descendants: string[] = [];
     const children = allNodes.filter(n => 
       (n.data as NodeData).parentIds?.includes(nodeId)
@@ -293,7 +292,7 @@ function DocumentGraphApp() {
     });
     
     return descendants;
-  };
+  }, []);
   
   // Handle node click to expand/collapse
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -335,7 +334,7 @@ function DocumentGraphApp() {
         return newSet;
       });
     }
-  }, [allNodesData, reactFlowInstance]);
+  }, [allNodesData, reactFlowInstance, getAllDescendantIds]);
   
   const onConnect = useCallback(
     (params: Connection) => {
@@ -364,6 +363,7 @@ function DocumentGraphApp() {
     };
     
     setNodes((nds) => [...nds, newNode]);
+    setAllNodesData((nds) => [...nds, newNode]);
     setNewNodeData({ type: 'person', label: '', description: '' });
     setShowAddModal(false);
   };
@@ -383,6 +383,7 @@ function DocumentGraphApp() {
         },
       };
       setNodes((nds) => [...nds, documentNode]);
+      setAllNodesData((nds) => [...nds, documentNode]);
     }
   };
   
@@ -565,7 +566,14 @@ function DocumentGraphApp() {
     
     const layoutedNodes = autoLayout(allNodes);
     setAllNodesData(layoutedNodes);
-    setNodes(layoutedNodes);
+    
+    // Only show level 1 and 2 nodes initially
+    const initialVisibleNodes = layoutedNodes.filter(n => {
+      const nodeData = n.data as NodeData;
+      return nodeData.level === 1 || nodeData.level === 2;
+    });
+    
+    setNodes(initialVisibleNodes);
     
     // Create edges
     const sampleEdges: Edge[] = [
@@ -591,70 +599,68 @@ function DocumentGraphApp() {
     setEdges(sampleEdges);
   }, [setNodes, setEdges]);
   
-  // Update node expansion state
+  // Update node expansion state and visibility
   useEffect(() => {
-    setNodes(nodes => nodes.map(node => ({
+    // Update expansion state
+    const updatedAllNodes = allNodesData.map(node => ({
       ...node,
       data: {
         ...node.data,
         isExpanded: expandedNodes.has(node.id)
       }
-    })));
-  }, [expandedNodes, setNodes]);
-  
-  // Filter nodes based on expansion state
-  const visibleNodes = allNodesData.filter(node => {
-    const nodeData = node.data as NodeData;
+    }));
     
-    // Always show level 1 and 2
-    if (nodeData.level === 1 || nodeData.level === 2) return true;
-    
-    // For other nodes, check if ALL parent nodes in the chain are expanded
-    if (nodeData.parentIds) {
-      // Check immediate parent first
-      const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
-      if (!immediateParentExpanded) return false;
+    // Filter visible nodes
+    const visibleNodes = updatedAllNodes.filter(node => {
+      const nodeData = node.data as NodeData;
       
-      // For level 4 nodes, also check if grandparent is expanded
-      if (nodeData.level === 4) {
-        const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
-        if (parent) {
-          const grandParentIds = (parent.data as NodeData).parentIds || [];
-          const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
-          if (!grandParentExpanded) return false;
+      // Always show level 1 and 2
+      if (nodeData.level === 1 || nodeData.level === 2) return true;
+      
+      // For other nodes, check if ALL parent nodes in the chain are expanded
+      if (nodeData.parentIds) {
+        // Check immediate parent first
+        const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
+        if (!immediateParentExpanded) return false;
+        
+        // For level 4 nodes, also check if grandparent is expanded
+        if (nodeData.level === 4) {
+          const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
+          if (parent) {
+            const grandParentIds = (parent.data as NodeData).parentIds || [];
+            const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
+            if (!grandParentExpanded) return false;
+          }
         }
+        
+        return true;
       }
       
-      return true;
-    }
+      return false;
+    });
     
-    return false;
-  });
-  
-  // Filter edges to only show those between visible nodes
-  const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
-  const visibleEdges = edges.filter(edge => 
-    visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-  );
+    setNodes(visibleNodes);
+  }, [expandedNodes, allNodesData, setNodes]);
   
   // Apply search filter
-  const filteredNodes = visibleNodes.filter(node => {
+  const filteredNodes = nodes.filter(node => {
     if (!searchQuery) return true;
     const nodeData = node.data as NodeData;
     return nodeData.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
            nodeData.description?.toLowerCase().includes(searchQuery.toLowerCase());
   });
   
-  const filteredEdges = visibleEdges.filter(edge =>
-    filteredNodes.some(node => node.id === edge.source || node.id === edge.target)
+  const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
+  const filteredEdges = edges.filter(edge => 
+    visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
   );
   
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
       <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100">
         <ReactFlow
-          nodes={searchQuery ? filteredNodes : visibleNodes}
-          edges={searchQuery ? filteredEdges : visibleEdges}
+          nodes={searchQuery ? filteredNodes : nodes}
+          edges={searchQuery ? filteredEdges : edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -812,10 +818,15 @@ function DocumentGraphApp() {
   );
 }
 
-export default function App() {
+// Wrapper component
+function DocumentGraphApp() {
   return (
     <ReactFlowProvider>
-      <DocumentGraphApp />
+      <DocumentGraphInner />
     </ReactFlowProvider>
   );
+}
+
+export default function App() {
+  return <DocumentGraphApp />;
 }
