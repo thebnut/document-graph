@@ -43,7 +43,8 @@ import {
   Mail,
   Phone,
   MapPin,
-  DollarSign
+  DollarSign,
+  RotateCcw
 } from 'lucide-react';
 
 // Extended node data structure
@@ -321,7 +322,6 @@ function DocumentGraphInner() {
         }
         
         const spacing = 120;
-        const totalWidth = (children.length - 1) * spacing;
         
         children.forEach((node, index) => {
           if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
@@ -406,6 +406,39 @@ function DocumentGraphInner() {
       });
     }
   }, [allNodesData, reactFlowInstance, getAllDescendantIds]);
+  
+  // Handle reset canvas
+  const handleResetCanvas = useCallback(() => {
+    // Clear all expanded nodes
+    setExpandedNodes(new Set());
+    
+    // Reset manual positioning for all nodes
+    const resetNodes = allNodesData.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        isManuallyPositioned: false
+      }
+    }));
+    
+    // Apply auto-layout
+    const layoutedNodes = autoLayout(resetNodes);
+    setAllNodesData(layoutedNodes);
+    
+    // Focus on the center with level 1 and 2 nodes
+    setTimeout(() => {
+      const level12Nodes = layoutedNodes.filter(n => {
+        const nodeData = n.data as NodeData;
+        return nodeData.level === 1 || nodeData.level === 2;
+      });
+      
+      reactFlowInstance.fitView({
+        nodes: level12Nodes,
+        duration: 800,
+        padding: 0.5,
+      });
+    }, 100);
+  }, [allNodesData, reactFlowInstance]);
   
   const onConnect = useCallback(
     (params: Connection) => {
@@ -807,6 +840,15 @@ useEffect(() => {
             >
               <FileText className="w-5 h-5" />
               Upload Document
+            </button>
+            
+            <button
+              onClick={handleResetCanvas}
+              className="bg-orange-500 hover:bg-orange-600 text-white rounded-lg px-4 py-2 flex items-center gap-2 transition-colors shadow-lg"
+              title="Reset Canvas"
+            >
+              <RotateCcw className="w-5 h-5" />
+              Reset Canvas
             </button>
             
             <button
