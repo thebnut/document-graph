@@ -19,7 +19,32 @@ import ReactFlow, {
   ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Upload, Search, Moon, Sun, User, Home, Car, FileText, X, ChevronRight, ChevronDown } from 'lucide-react';
+import { 
+  Upload, 
+  Search, 
+  Moon, 
+  Sun, 
+  User, 
+  Home, 
+  Car, 
+  FileText, 
+  X, 
+  ChevronRight, 
+  ChevronDown,
+  Sparkles,
+  Trees,
+  CreditCard,
+  Heart,
+  Shield,
+  Plane,
+  Briefcase,
+  FolderOpen,
+  Calendar,
+  Mail,
+  Phone,
+  MapPin,
+  DollarSign
+} from 'lucide-react';
 
 // Extended node data structure
 interface NodeData {
@@ -33,6 +58,7 @@ interface NodeData {
   parentIds?: string[];
   isExpanded?: boolean;
   hasChildren?: boolean;
+  isManuallyPositioned?: boolean;
 }
 
 // Custom bubble node component with expansion
@@ -72,6 +98,28 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
   
   const getIcon = () => {
     const iconClass = data.type === 'person' || data.level === 1 ? 'w-8 h-8' : 'w-6 h-6';
+    
+    // More specific icons based on label content
+    const labelLower = data.label.toLowerCase();
+    
+    // Check for specific document types
+    if (labelLower.includes('cleaner')) return <Sparkles className={iconClass} />;
+    if (labelLower.includes('gardener')) return <Trees className={iconClass} />;
+    if (labelLower.includes('passport')) return <Plane className={iconClass} />;
+    if (labelLower.includes('insurance')) return <Shield className={iconClass} />;
+    if (labelLower.includes('health')) return <Heart className={iconClass} />;
+    if (labelLower.includes('medicare')) return <CreditCard className={iconClass} />;
+    if (labelLower.includes('visa')) return <Plane className={iconClass} />;
+    if (labelLower.includes('birth certificate')) return <FileText className={iconClass} />;
+    if (labelLower.includes('document')) return <FolderOpen className={iconClass} />;
+    if (labelLower.includes('email')) return <Mail className={iconClass} />;
+    if (labelLower.includes('phone')) return <Phone className={iconClass} />;
+    if (labelLower.includes('address')) return <MapPin className={iconClass} />;
+    if (labelLower.includes('financial') || labelLower.includes('bank')) return <DollarSign className={iconClass} />;
+    if (labelLower.includes('work') || labelLower.includes('employment')) return <Briefcase className={iconClass} />;
+    if (labelLower.includes('calendar') || labelLower.includes('schedule')) return <Calendar className={iconClass} />;
+    
+    // Default icons by type
     switch (data.type) {
       case 'person':
       case 'pet':
@@ -108,62 +156,32 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
           </div>
         )}
         
-        {/* Dynamic handles for all sides */}
+        {/* Single handle for connections - positioned at center */}
         <Handle 
           type="source" 
           position={Position.Top}
-          id="top"
           className="opacity-0" 
-          style={{ top: 0 }}
-        />
-        <Handle 
-          type="source" 
-          position={Position.Right}
-          id="right"
-          className="opacity-0" 
-          style={{ right: 0 }}
-        />
-        <Handle 
-          type="source" 
-          position={Position.Bottom}
-          id="bottom"
-          className="opacity-0" 
-          style={{ bottom: 0 }}
-        />
-        <Handle 
-          type="source" 
-          position={Position.Left}
-          id="left"
-          className="opacity-0" 
-          style={{ left: 0 }}
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%'
+          }}
         />
         <Handle 
           type="target" 
           position={Position.Top}
-          id="target-top"
           className="opacity-0" 
-          style={{ top: 0 }}
-        />
-        <Handle 
-          type="target" 
-          position={Position.Right}
-          id="target-right"
-          className="opacity-0" 
-          style={{ right: 0 }}
-        />
-        <Handle 
-          type="target" 
-          position={Position.Bottom}
-          id="target-bottom"
-          className="opacity-0" 
-          style={{ bottom: 0 }}
-        />
-        <Handle 
-          type="target" 
-          position={Position.Left}
-          id="target-left"
-          className="opacity-0" 
-          style={{ left: 0 }}
+          style={{ 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%'
+          }}
         />
       </div>
       
@@ -209,70 +227,111 @@ function DocumentGraphInner() {
     description: '',
   });
   
-  // Auto-layout function
-  const autoLayout = (nodes: Node[]) => {
+  // Auto-layout function with better spacing
+  const autoLayout = (nodes: Node[], preserveManualPositions = false) => {
     const centerX = 400;
     const centerY = 300;
-    const level2Radius = 200;
+    const level2Radius = 250;
+    const level3Radius = 200;
+    const level4Spacing = 150;
     
     const layoutNodes = [...nodes];
     
     // Position level 1 (central) nodes
     const level1Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 1);
     level1Nodes.forEach((node, index) => {
-      node.position = {
-        x: centerX + (index === 0 ? -100 : 100),
-        y: centerY
-      };
-    });
-    
-    // Position level 2 nodes in a circle around center
-    const level2Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 2);
-    const angleStep2 = (2 * Math.PI) / level2Nodes.length;
-    level2Nodes.forEach((node, index) => {
-      const angle = index * angleStep2 - Math.PI / 2;
-      node.position = {
-        x: centerX + Math.cos(angle) * level2Radius,
-        y: centerY + Math.sin(angle) * level2Radius
-      };
-    });
-    
-    // Position level 3 nodes around their parents
-    const level3Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 3);
-    level3Nodes.forEach((node) => {
-      const parentId = (node.data as NodeData).parentIds?.[0];
-      const parent = layoutNodes.find(n => n.id === parentId);
-      if (parent) {
-        const siblings = level3Nodes.filter(n => 
-          (n.data as NodeData).parentIds?.includes(parentId!)
-        );
-        const index = siblings.indexOf(node);
-        const angleOffset = (index - (siblings.length - 1) / 2) * 0.3;
-        const angle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX) + angleOffset;
-        
+      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
         node.position = {
-          x: parent.position.x + Math.cos(angle) * 150,
-          y: parent.position.y + Math.sin(angle) * 150
+          x: centerX + (index === 0 ? -100 : 100),
+          y: centerY
         };
       }
     });
     
-    // Position level 4 nodes
-    const level4Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 4);
-    level4Nodes.forEach((node) => {
+    // Position level 2 nodes in a circle around center
+    const level2Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 2);
+    const angleStep2 = (2 * Math.PI) / Math.max(level2Nodes.length, 1);
+    level2Nodes.forEach((node, index) => {
+      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+        const angle = index * angleStep2 - Math.PI / 2;
+        node.position = {
+          x: centerX + Math.cos(angle) * level2Radius,
+          y: centerY + Math.sin(angle) * level2Radius
+        };
+      }
+    });
+    
+    // Position level 3 nodes with proper spacing
+    const level3NodesByParent = new Map<string, Node[]>();
+    const level3Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 3);
+    
+    level3Nodes.forEach(node => {
       const parentId = (node.data as NodeData).parentIds?.[0];
+      if (parentId) {
+        if (!level3NodesByParent.has(parentId)) {
+          level3NodesByParent.set(parentId, []);
+        }
+        level3NodesByParent.get(parentId)!.push(node);
+      }
+    });
+    
+    level3NodesByParent.forEach((children, parentId) => {
       const parent = layoutNodes.find(n => n.id === parentId);
       if (parent) {
-        const siblings = level4Nodes.filter(n => 
-          (n.data as NodeData).parentIds?.includes(parentId!)
-        );
-        const siblingIndex = siblings.indexOf(node);
-        const offset = (siblingIndex - (siblings.length - 1) / 2) * 100;
+        const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
+        const spreadAngle = Math.min(Math.PI / 3, (Math.PI / 6) * children.length);
+        const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
         
-        node.position = {
-          x: parent.position.x + offset,
-          y: parent.position.y + 150
-        };
+        children.forEach((node, index) => {
+          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+            const childAngle = parentAngle + (index - (children.length - 1) / 2) * angleStep;
+            node.position = {
+              x: parent.position.x + Math.cos(childAngle) * level3Radius,
+              y: parent.position.y + Math.sin(childAngle) * level3Radius
+            };
+          }
+        });
+      }
+    });
+    
+    // Position level 4 nodes with proper spacing
+    const level4NodesByParent = new Map<string, Node[]>();
+    const level4Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 4);
+    
+    level4Nodes.forEach(node => {
+      const parentId = (node.data as NodeData).parentIds?.[0];
+      if (parentId) {
+        if (!level4NodesByParent.has(parentId)) {
+          level4NodesByParent.set(parentId, []);
+        }
+        level4NodesByParent.get(parentId)!.push(node);
+      }
+    });
+    
+    level4NodesByParent.forEach((children, parentId) => {
+      const parent = layoutNodes.find(n => n.id === parentId);
+      if (parent) {
+        const grandParent = layoutNodes.find(n => 
+          n.id === (parent.data as NodeData).parentIds?.[0]
+        );
+        
+        let baseAngle = Math.PI / 2; // Default downward
+        if (grandParent) {
+          baseAngle = Math.atan2(parent.position.y - grandParent.position.y, parent.position.x - grandParent.position.x);
+        }
+        
+        const spacing = 120;
+        const totalWidth = (children.length - 1) * spacing;
+        
+        children.forEach((node, index) => {
+          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+            const offset = (index - (children.length - 1) / 2) * spacing;
+            node.position = {
+              x: parent.position.x + offset * Math.cos(baseAngle + Math.PI / 2),
+              y: parent.position.y + level4Spacing + offset * Math.sin(baseAngle + Math.PI / 2)
+            };
+          }
+        });
       }
     });
     
@@ -292,6 +351,15 @@ function DocumentGraphInner() {
     });
     
     return descendants;
+  }, []);
+  
+  // Handle node drag to mark as manually positioned
+  const handleNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+    setAllNodesData(prev => prev.map(n => 
+      n.id === node.id 
+        ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
+        : n
+    ));
   }, []);
   
   // Handle node click to expand/collapse
@@ -318,9 +386,12 @@ function DocumentGraphInner() {
           // Expanding: add this node
           newSet.add(node.id);
           
-          // Focus on expanded area
+          // Apply layout to new children while preserving manual positions
           setTimeout(() => {
-            const children = allNodesData.filter(n => 
+            const updatedNodes = autoLayout(allNodesData, true);
+            setAllNodesData(updatedNodes);
+            
+            const children = updatedNodes.filter(n => 
               (n.data as NodeData).parentIds?.includes(node.id)
             );
             const nodesToFit = [node, ...children];
@@ -340,8 +411,8 @@ function DocumentGraphInner() {
     (params: Connection) => {
       const edge = {
         ...params,
-        type: 'smoothstep',
-        animated: true,
+        type: 'straight', // Changed from smoothstep to straight
+        animated: false, // Remove animation for cleaner look
         style: {
           strokeWidth: 2,
           stroke: darkMode ? '#9ca3af' : '#6b7280',
@@ -575,72 +646,79 @@ function DocumentGraphInner() {
     
     setNodes(initialVisibleNodes);
     
-    // Create edges
+    // Create edges with straight lines
     const sampleEdges: Edge[] = [
       // Level 1 to Level 2
-      { id: 'brett-home', source: 'brett', target: 'home', type: 'smoothstep', animated: true },
-      { id: 'gemma-home', source: 'gemma', target: 'home', type: 'smoothstep', animated: true },
-      { id: 'brett-docs', source: 'brett', target: 'family-docs', type: 'smoothstep', animated: true },
-      { id: 'gemma-docs', source: 'gemma', target: 'family-docs', type: 'smoothstep', animated: true },
+      { id: 'brett-home', source: 'brett', target: 'home', type: 'straight', animated: false },
+      { id: 'gemma-home', source: 'gemma', target: 'home', type: 'straight', animated: false },
+      { id: 'brett-docs', source: 'brett', target: 'family-docs', type: 'straight', animated: false },
+      { id: 'gemma-docs', source: 'gemma', target: 'family-docs', type: 'straight', animated: false },
       
       // Level 2 to Level 3
-      { id: 'home-insurance', source: 'home', target: 'insurance', type: 'smoothstep', animated: true },
-      { id: 'home-cleaner', source: 'home', target: 'cleaner', type: 'smoothstep', animated: true },
-      { id: 'home-gardener', source: 'home', target: 'gardener', type: 'smoothstep', animated: true },
-      { id: 'docs-passports', source: 'family-docs', target: 'passports', type: 'smoothstep', animated: true },
-      { id: 'docs-medicare', source: 'family-docs', target: 'medicare', type: 'smoothstep', animated: true },
-      { id: 'docs-health', source: 'family-docs', target: 'health-insurance', type: 'smoothstep', animated: true },
+      { id: 'home-insurance', source: 'home', target: 'insurance', type: 'straight', animated: false },
+      { id: 'home-cleaner', source: 'home', target: 'cleaner', type: 'straight', animated: false },
+      { id: 'home-gardener', source: 'home', target: 'gardener', type: 'straight', animated: false },
+      { id: 'docs-passports', source: 'family-docs', target: 'passports', type: 'straight', animated: false },
+      { id: 'docs-medicare', source: 'family-docs', target: 'medicare', type: 'straight', animated: false },
+      { id: 'docs-health', source: 'family-docs', target: 'health-insurance', type: 'straight', animated: false },
       
       // Level 3 to Level 4
-      { id: 'passports-brett', source: 'passports', target: 'brett-passport', type: 'smoothstep', animated: true },
-      { id: 'passports-gemma', source: 'passports', target: 'gemma-passport', type: 'smoothstep', animated: true },
+      { id: 'passports-brett', source: 'passports', target: 'brett-passport', type: 'straight', animated: false },
+      { id: 'passports-gemma', source: 'passports', target: 'gemma-passport', type: 'straight', animated: false },
     ];
     
     setEdges(sampleEdges);
   }, [setNodes, setEdges]);
   
   // Update node expansion state and visibility
-  useEffect(() => {
-    // Update expansion state
-    const updatedAllNodes = allNodesData.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        isExpanded: expandedNodes.has(node.id)
-      }
-    }));
-    
-    // Filter visible nodes
-    const visibleNodes = updatedAllNodes.filter(node => {
-      const nodeData = node.data as NodeData;
-      
-      // Always show level 1 and 2
-      if (nodeData.level === 1 || nodeData.level === 2) return true;
-      
-      // For other nodes, check if ALL parent nodes in the chain are expanded
-      if (nodeData.parentIds) {
-        // Check immediate parent first
-        const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
-        if (!immediateParentExpanded) return false;
-        
-        // For level 4 nodes, also check if grandparent is expanded
-        if (nodeData.level === 4) {
-          const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
-          if (parent) {
-            const grandParentIds = (parent.data as NodeData).parentIds || [];
-            const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
-            if (!grandParentExpanded) return false;
-          }
+useEffect(() => {
+  // Track current node positions before update
+  const currentPositions = new Map(nodes.map(n => [n.id, n.position]));
+
+  // Update expansion state
+  const updatedAllNodes = allNodesData.map(node => ({
+    ...node,
+    data: {
+      ...node.data,
+      isExpanded: expandedNodes.has(node.id)
+    },
+    // Preserve current position if node is already visible and manually positioned
+    position: (node.data as NodeData).isManuallyPositioned && currentPositions.has(node.id)
+      ? currentPositions.get(node.id)!
+      : node.position
+  }));
+
+  // Filter visible nodes
+  const visibleNodes = updatedAllNodes.filter(node => {
+    const nodeData = node.data as NodeData;
+
+    // Always show level 1 and 2
+    if (nodeData.level === 1 || nodeData.level === 2) return true;
+
+    // For other nodes, check if ALL parent nodes in the chain are expanded
+    if (nodeData.parentIds) {
+      // Check immediate parent first
+      const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
+      if (!immediateParentExpanded) return false;
+
+      // For level 4 nodes, also check if grandparent is expanded
+      if (nodeData.level === 4) {
+        const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
+        if (parent) {
+          const grandParentIds = (parent.data as NodeData).parentIds || [];
+          const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
+          if (!grandParentExpanded) return false;
         }
-        
-        return true;
       }
-      
-      return false;
-    });
-    
-    setNodes(visibleNodes);
-  }, [expandedNodes, allNodesData, setNodes]);
+
+      return true;
+    }
+
+    return false;
+  });
+
+  setNodes(visibleNodes);
+}, [expandedNodes, allNodesData, setNodes]); // <-- 'nodes' removed
   
   // Apply search filter
   const filteredNodes = nodes.filter(node => {
@@ -665,6 +743,7 @@ function DocumentGraphInner() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
           fitView
           className="bg-transparent"
