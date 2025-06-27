@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ReactFlow, {
-  addEdge,
   Background,
   Controls,
   MiniMap,
@@ -16,7 +16,6 @@ import ReactFlow, {
   NodeTypes,
   BackgroundVariant,
   useReactFlow,
-  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { 
@@ -47,6 +46,115 @@ import {
   RotateCcw
 } from 'lucide-react';
 
+// Comprehensive ResizeObserver error suppression
+const suppressResizeObserverError = (e: any) => {
+  const message = e.message || e.reason?.message || '';
+  return message.includes('ResizeObserver loop completed with undelivered notifications');
+};
+
+// Global error handlers
+window.addEventListener('error', (e) => {
+  if (suppressResizeObserverError(e)) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return false;
+  }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  if (suppressResizeObserverError(e)) {
+    e.preventDefault();
+    return false;
+  }
+});
+
+// Override ResizeObserver with debounced callback
+const OriginalResizeObserver = window.ResizeObserver;
+window.ResizeObserver = class extends OriginalResizeObserver {
+  constructor(callback: ResizeObserverCallback) {
+    let debounceTimer: number;
+    const debouncedCallback: ResizeObserverCallback = (entries, observer) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => {
+        try {
+          requestAnimationFrame(() => {
+            try {
+              callback(entries, observer);
+            } catch (e) {
+              if (!suppressResizeObserverError(e)) {
+                throw e;
+              }
+            }
+          });
+        } catch (e) {
+          if (!suppressResizeObserverError(e)) {
+            throw e;
+          }
+        }
+      }, 0);
+    };
+    super(debouncedCallback);
+  }
+};
+
+// Console error suppression
+const originalError = console.error;
+console.error = (...args) => {
+  if (suppressResizeObserverError({ message: args[0]?.toString?.() })) {
+    return;
+  }
+  originalError.apply(console, args);
+};
+
+// React Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    if (suppressResizeObserverError(error)) {
+      return { hasError: false };
+    }
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (!suppressResizeObserverError(error)) {
+      console.error('React Error Boundary caught an error:', error, errorInfo);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-red-50 dark:bg-red-900">
+          <div className="text-center p-8">
+            <h2 className="text-2xl font-bold text-red-800 dark:text-red-200 mb-4">
+              Something went wrong
+            </h2>
+            <p className="text-red-600 dark:text-red-300 mb-4">
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Extended node data structure
 interface NodeData {
   label: string;
@@ -62,9 +170,26 @@ interface NodeData {
   isManuallyPositioned?: boolean;
 }
 
+// Tooltip state interface
+interface TooltipState {
+  show: boolean;
+  nodeId: string | null;
+  data: NodeData | null;
+  position: { x: number; y: number };
+}
+
 // Custom bubble node component with expansion
-const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
-  const [showDetails, setShowDetails] = useState(false);
+const EntityNode = ({ 
+  data, 
+  id,
+  onShowTooltip,
+  onHideTooltip 
+}: { 
+  data: NodeData; 
+  id: string;
+  onShowTooltip: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
+  onHideTooltip: () => void;
+}) => {
   
   // Different sizes for different node types
   const getNodeSize = () => {
@@ -136,8 +261,8 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
     <div className="relative">
       <div
         className={`${getNodeSize()} ${getNodeColor()} text-white rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-110 flex flex-col items-center justify-center p-3 border-2 border-white/20 relative`}
-        onMouseEnter={() => setShowDetails(true)}
-        onMouseLeave={() => setShowDetails(false)}
+        onMouseEnter={(e) => data.description && onShowTooltip(id, data, e)}
+        onMouseLeave={() => onHideTooltip()}
       >
         <div className="flex flex-col items-center gap-1">
           {getIcon()}
@@ -157,7 +282,7 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
           </div>
         )}
         
-        {/* Single handle for connections - positioned at center */}
+        {/* Small centered handle for connections - allows dynamic connection points */}
         <Handle 
           type="source" 
           position={Position.Top}
@@ -166,45 +291,37 @@ const EntityNode = ({ data, id }: { data: NodeData; id: string }) => {
             top: '50%', 
             left: '50%', 
             transform: 'translate(-50%, -50%)',
-            width: '100%',
-            height: '100%',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%'
           }}
         />
         <Handle 
           type="target" 
-          position={Position.Top}
+          position={Position.Bottom}
           className="opacity-0" 
           style={{ 
             top: '50%', 
             left: '50%', 
             transform: 'translate(-50%, -50%)',
-            width: '100%',
-            height: '100%',
+            width: '8px',
+            height: '8px',
             borderRadius: '50%'
           }}
         />
       </div>
-      
-      {showDetails && data.description && (
-        <div className="absolute z-50 top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 min-w-[250px] border border-gray-200 dark:border-gray-700">
-          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-l border-t border-gray-200 dark:border-gray-700"></div>
-          <h4 className="font-semibold mb-2">{data.label}</h4>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{data.description}</p>
-          {data.expiry && (
-            <p className="text-sm text-red-600 dark:text-red-400">Expires: {data.expiry}</p>
-          )}
-          {data.source && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {data.source}</p>
-          )}
-        </div>
-      )}
     </div>
   );
 };
 
 const nodeTypes: NodeTypes = {
-  entity: EntityNode,
+  entity: (props: any) => (
+    <EntityNode 
+      {...props} 
+      onShowTooltip={props.data.onShowTooltip}
+      onHideTooltip={props.data.onHideTooltip}
+    />
+  ),
 };
 
 // Inner component that uses ReactFlow hooks
@@ -220,6 +337,14 @@ function DocumentGraphInner() {
   
   // Store all nodes data
   const [allNodesData, setAllNodesData] = useState<Node[]>([]);
+  
+  // Global tooltip state
+  const [tooltipState, setTooltipState] = useState<TooltipState>({
+    show: false,
+    nodeId: null,
+    data: null,
+    position: { x: 0, y: 0 }
+  });
   
   // Form state
   const [newNodeData, setNewNodeData] = useState<Partial<NodeData>>({
@@ -354,7 +479,7 @@ function DocumentGraphInner() {
   }, []);
   
   // Handle node drag to mark as manually positioned
-  const handleNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     setAllNodesData(prev => prev.map(n => 
       n.id === node.id 
         ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
@@ -363,7 +488,7 @@ function DocumentGraphInner() {
   }, []);
   
   // Handle node click to expand/collapse
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     const nodeData = node.data as NodeData;
     if (nodeData.hasChildren) {
       setExpandedNodes(prev => {
@@ -407,6 +532,25 @@ function DocumentGraphInner() {
     }
   }, [allNodesData, reactFlowInstance, getAllDescendantIds]);
   
+  // Handle tooltip show
+  const handleShowTooltip = useCallback((nodeId: string, nodeData: NodeData, event: React.MouseEvent) => {
+    const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setTooltipState({
+      show: true,
+      nodeId,
+      data: nodeData,
+      position: {
+        x: rect.left + rect.width / 2,
+        y: rect.bottom + 10
+      }
+    });
+  }, []);
+
+  // Handle tooltip hide
+  const handleHideTooltip = useCallback(() => {
+    setTooltipState(prev => ({ ...prev, show: false }));
+  }, []);
+
   // Handle reset canvas
   const handleResetCanvas = useCallback(() => {
     // Clear all expanded nodes
@@ -441,19 +585,12 @@ function DocumentGraphInner() {
   }, [allNodesData, reactFlowInstance]);
   
   const onConnect = useCallback(
-    (params: Connection) => {
-      const edge = {
-        ...params,
-        type: 'straight', // Changed from smoothstep to straight
-        animated: false, // Remove animation for cleaner look
-        style: {
-          strokeWidth: 2,
-          stroke: darkMode ? '#9ca3af' : '#6b7280',
-        },
-      };
-      setEdges((eds) => addEdge(edge, eds));
+    (_params: Connection) => {
+      // Prevent all new connections to avoid unwanted edges between sibling nodes
+      // Only pre-defined parent-child relationships should exist
+      return;
     },
-    [setEdges, darkMode]
+    []
   );
   
   const addNode = () => {
@@ -753,15 +890,31 @@ useEffect(() => {
   setNodes(visibleNodes);
 }, [expandedNodes, allNodesData, setNodes]); // <-- 'nodes' removed
   
-  // Apply search filter
+  // Apply search filter and add tooltip handlers to nodes
   const filteredNodes = nodes.filter(node => {
     if (!searchQuery) return true;
     const nodeData = node.data as NodeData;
     return nodeData.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
            nodeData.description?.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  }).map(node => ({
+    ...node,
+    data: {
+      ...node.data,
+      onShowTooltip: handleShowTooltip,
+      onHideTooltip: handleHideTooltip
+    }
+  }));
   
-  const visibleNodeIds = new Set(filteredNodes.map(n => n.id));
+  const nodesToDisplay = searchQuery ? filteredNodes : nodes.map(node => ({
+    ...node,
+    data: {
+      ...node.data,
+      onShowTooltip: handleShowTooltip,
+      onHideTooltip: handleHideTooltip
+    }
+  }));
+  
+  const visibleNodeIds = new Set(nodesToDisplay.map(n => n.id));
   const filteredEdges = edges.filter(edge => 
     visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
   );
@@ -770,8 +923,8 @@ useEffect(() => {
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
       <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100">
         <ReactFlow
-          nodes={searchQuery ? filteredNodes : nodes}
-          edges={searchQuery ? filteredEdges : edges}
+          nodes={nodesToDisplay}
+          edges={filteredEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -780,7 +933,6 @@ useEffect(() => {
           nodeTypes={nodeTypes}
           fitView
           className="bg-transparent"
-          connectionMode={ConnectionMode.Loose}
         >
           <Background 
             color={darkMode ? '#374151' : '#e5e7eb'} 
@@ -934,6 +1086,29 @@ useEffect(() => {
             </div>
           </div>
         )}
+        
+        {/* Portal tooltip */}
+        {tooltipState.show && tooltipState.data && createPortal(
+          <div 
+            className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 min-w-[250px] border border-gray-200 dark:border-gray-700 pointer-events-none"
+            style={{
+              left: `${tooltipState.position.x}px`,
+              top: `${tooltipState.position.y}px`,
+              transform: 'translateX(-50%)'
+            }}
+          >
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-l border-t border-gray-200 dark:border-gray-700"></div>
+            <h4 className="font-semibold mb-2">{tooltipState.data.label}</h4>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{tooltipState.data.description}</p>
+            {tooltipState.data.expiry && (
+              <p className="text-sm text-red-600 dark:text-red-400">Expires: {tooltipState.data.expiry}</p>
+            )}
+            {tooltipState.data.source && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {tooltipState.data.source}</p>
+            )}
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );
@@ -949,5 +1124,9 @@ function DocumentGraphApp() {
 }
 
 export default function App() {
-  return <DocumentGraphApp />;
+  return (
+    <ErrorBoundary>
+      <DocumentGraphApp />
+    </ErrorBoundary>
+  );
 }
