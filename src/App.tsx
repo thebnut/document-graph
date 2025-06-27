@@ -12,7 +12,6 @@ import ReactFlow, {
   Handle,
   Position,
   Node,
-  Edge,
   NodeTypes,
   BackgroundVariant,
   useReactFlow,
@@ -45,6 +44,7 @@ import {
   DollarSign,
   RotateCcw
 } from 'lucide-react';
+import { dataService, NodeData } from './services/dataService';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -155,20 +155,7 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// Extended node data structure
-interface NodeData {
-  label: string;
-  type: 'person' | 'pet' | 'asset' | 'document';
-  subtype?: string;
-  description?: string;
-  expiry?: string;
-  source?: string;
-  level?: number;
-  parentIds?: string[];
-  isExpanded?: boolean;
-  hasChildren?: boolean;
-  isManuallyPositioned?: boolean;
-}
+// NodeData interface is now imported from dataService
 
 // Tooltip state interface
 interface TooltipState {
@@ -464,18 +451,8 @@ function DocumentGraphInner() {
   };
   
   // Get all descendant IDs recursively
-  const getAllDescendantIds = useCallback((nodeId: string, allNodes: Node[]): string[] => {
-    const descendants: string[] = [];
-    const children = allNodes.filter(n => 
-      (n.data as NodeData).parentIds?.includes(nodeId)
-    );
-    
-    children.forEach(child => {
-      descendants.push(child.id);
-      descendants.push(...getAllDescendantIds(child.id, allNodes));
-    });
-    
-    return descendants;
+  const getAllDescendantIds = useCallback((nodeId: string): string[] => {
+    return dataService.getAllDescendantIds(nodeId);
   }, []);
   
   // Handle node drag to mark as manually positioned
@@ -496,7 +473,7 @@ function DocumentGraphInner() {
         if (newSet.has(node.id)) {
           // Collapsing: remove this node and all descendants
           newSet.delete(node.id);
-          const descendants = getAllDescendantIds(node.id, allNodesData);
+          const descendants = getAllDescendantIds(node.id);
           descendants.forEach(id => newSet.delete(id));
           
           // Focus on the collapsed node
@@ -628,182 +605,11 @@ function DocumentGraphInner() {
     }
   };
   
-  // Initialize with sample data
+  // Initialize with data from data service
   React.useEffect(() => {
-    const allNodes: Node[] = [
-      // Level 1 - Central people
-      {
-        id: 'brett',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Brett Thebault', 
-          type: 'person', 
-          description: 'Primary account holder',
-          level: 1,
-          hasChildren: true,
-          isExpanded: false
-        },
-      },
-      {
-        id: 'gemma',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Gemma Thebault', 
-          type: 'person', 
-          description: 'Primary account holder',
-          level: 1,
-          hasChildren: true,
-          isExpanded: false
-        },
-      },
-      
-      // Level 2 - Direct connections
-      {
-        id: 'home',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: '22 Banya St', 
-          type: 'asset', 
-          subtype: 'property', 
-          description: 'Family home',
-          level: 2,
-          parentIds: ['brett', 'gemma'],
-          hasChildren: true,
-          isExpanded: false
-        },
-      },
-      {
-        id: 'family-docs',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Family Documents', 
-          type: 'document', 
-          description: 'Central repository for family documents',
-          level: 2,
-          parentIds: ['brett', 'gemma'],
-          hasChildren: true,
-          isExpanded: false
-        },
-      },
-      
-      // Level 3 - Home related
-      {
-        id: 'insurance',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Home Insurance', 
-          type: 'document', 
-          description: 'RACQ Home Insurance\nPolicy: HM-789456123', 
-          expiry: '2025-08-15',
-          level: 3,
-          parentIds: ['home'],
-          hasChildren: false
-        },
-      },
-      {
-        id: 'cleaner',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Cleaner - Estee', 
-          type: 'document', 
-          description: 'Estee - House Cleaner\n$560/week\nContact: 0412 345 678',
-          level: 3,
-          parentIds: ['home'],
-          hasChildren: false
-        },
-      },
-      {
-        id: 'gardener',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Gardener - Elliot', 
-          type: 'document', 
-          description: 'Elliot - Gardener\n$150/fortnight\nContact: 0423 456 789',
-          level: 3,
-          parentIds: ['home'],
-          hasChildren: false
-        },
-      },
-      
-      // Level 3 - Document categories
-      {
-        id: 'passports',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Passports', 
-          type: 'document', 
-          description: 'Family passports',
-          level: 3,
-          parentIds: ['family-docs'],
-          hasChildren: true,
-          isExpanded: false
-        },
-      },
-      {
-        id: 'medicare',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Medicare', 
-          type: 'document', 
-          description: 'Medicare Card\nNumber: 5123 45678 9\nBrett: 1, Gemma: 2',
-          level: 3,
-          parentIds: ['family-docs'],
-          hasChildren: false
-        },
-      },
-      {
-        id: 'health-insurance',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Health Insurance', 
-          type: 'document', 
-          description: 'Medibank Private\nPolicy: 123456789\nBrett: 01, Gemma: 02',
-          level: 3,
-          parentIds: ['family-docs'],
-          hasChildren: false
-        },
-      },
-      
-      // Level 4 - Individual passports
-      {
-        id: 'brett-passport',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Brett\'s Passport', 
-          type: 'document', 
-          description: 'Australian Passport\nNumber: PA1234567', 
-          expiry: '2032-03-15',
-          level: 4,
-          parentIds: ['passports'],
-          hasChildren: false
-        },
-      },
-      {
-        id: 'gemma-passport',
-        type: 'entity',
-        position: { x: 0, y: 0 },
-        data: { 
-          label: 'Gemma\'s Passport', 
-          type: 'document', 
-          description: 'Australian Passport\nNumber: PA7654321', 
-          expiry: '2031-11-22',
-          level: 4,
-          parentIds: ['passports'],
-          hasChildren: false
-        },
-      },
-    ];
+    // Convert entities to nodes
+    const allNodes = dataService.entitiesToNodes();
+    console.log('Loaded nodes from data service:', allNodes.length);
     
     const layoutedNodes = autoLayout(allNodes);
     setAllNodesData(layoutedNodes);
@@ -816,28 +622,10 @@ function DocumentGraphInner() {
     
     setNodes(initialVisibleNodes);
     
-    // Create edges with straight lines
-    const sampleEdges: Edge[] = [
-      // Level 1 to Level 2
-      { id: 'brett-home', source: 'brett', target: 'home', type: 'straight', animated: false },
-      { id: 'gemma-home', source: 'gemma', target: 'home', type: 'straight', animated: false },
-      { id: 'brett-docs', source: 'brett', target: 'family-docs', type: 'straight', animated: false },
-      { id: 'gemma-docs', source: 'gemma', target: 'family-docs', type: 'straight', animated: false },
-      
-      // Level 2 to Level 3
-      { id: 'home-insurance', source: 'home', target: 'insurance', type: 'straight', animated: false },
-      { id: 'home-cleaner', source: 'home', target: 'cleaner', type: 'straight', animated: false },
-      { id: 'home-gardener', source: 'home', target: 'gardener', type: 'straight', animated: false },
-      { id: 'docs-passports', source: 'family-docs', target: 'passports', type: 'straight', animated: false },
-      { id: 'docs-medicare', source: 'family-docs', target: 'medicare', type: 'straight', animated: false },
-      { id: 'docs-health', source: 'family-docs', target: 'health-insurance', type: 'straight', animated: false },
-      
-      // Level 3 to Level 4
-      { id: 'passports-brett', source: 'passports', target: 'brett-passport', type: 'straight', animated: false },
-      { id: 'passports-gemma', source: 'passports', target: 'gemma-passport', type: 'straight', animated: false },
-    ];
-    
-    setEdges(sampleEdges);
+    // Create edges from relationships
+    const edges = dataService.relationshipsToEdges();
+    console.log('Loaded edges from data service:', edges.length);
+    setEdges(edges);
   }, [setNodes, setEdges]);
   
   // Update node expansion state and visibility

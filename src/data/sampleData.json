@@ -1,0 +1,182 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "created": "2024-01-01T00:00:00Z",
+    "modified": "2024-01-01T00:00:00Z",
+    "description": "Sample family document graph data"
+  },
+  "entities": [
+    {
+      "id": "brett",
+      "label": "Brett Thebault",
+      "type": "person",
+      "description": "Primary account holder",
+      "level": 1,
+      "hasChildren": true
+    },
+    {
+      "id": "gemma",
+      "label": "Gemma Thebault",
+      "type": "person",
+      "description": "Primary account holder",
+      "level": 1,
+      "hasChildren": true
+    },
+    {
+      "id": "home",
+      "label": "22 Banya St",
+      "type": "asset",
+      "subtype": "property",
+      "description": "Family home",
+      "level": 2,
+      "parentIds": ["brett", "gemma"],
+      "hasChildren": true
+    },
+    {
+      "id": "family-docs",
+      "label": "Family Documents",
+      "type": "document",
+      "description": "Central repository for family documents",
+      "level": 2,
+      "parentIds": ["brett", "gemma"],
+      "hasChildren": true
+    },
+    {
+      "id": "insurance",
+      "label": "Home Insurance",
+      "type": "document",
+      "description": "RACQ Home Insurance\nPolicy: HM-789456123",
+      "expiry": "2025-08-15",
+      "level": 3,
+      "parentIds": ["home"],
+      "hasChildren": false
+    },
+    {
+      "id": "cleaner",
+      "label": "Cleaner - Estee",
+      "type": "document",
+      "description": "Estee - House Cleaner\n$560/week\nContact: 0412 345 678",
+      "level": 3,
+      "parentIds": ["home"],
+      "hasChildren": false
+    },
+    {
+      "id": "gardener",
+      "label": "Gardener - Elliot",
+      "type": "document",
+      "description": "Elliot - Gardener\n$150/fortnight\nContact: 0423 456 789",
+      "level": 3,
+      "parentIds": ["home"],
+      "hasChildren": false
+    },
+    {
+      "id": "passports",
+      "label": "Passports",
+      "type": "document",
+      "description": "Family passports",
+      "level": 3,
+      "parentIds": ["family-docs"],
+      "hasChildren": true
+    },
+    {
+      "id": "medicare",
+      "label": "Medicare",
+      "type": "document",
+      "description": "Medicare Card\nNumber: 5123 45678 9\nBrett: 1, Gemma: 2",
+      "level": 3,
+      "parentIds": ["family-docs"],
+      "hasChildren": false
+    },
+    {
+      "id": "health-insurance",
+      "label": "Health Insurance",
+      "type": "document",
+      "description": "Medibank Private\nPolicy: 123456789\nBrett: 01, Gemma: 02",
+      "level": 3,
+      "parentIds": ["family-docs"],
+      "hasChildren": false
+    },
+    {
+      "id": "brett-passport",
+      "label": "Brett's Passport",
+      "type": "document",
+      "description": "Australian Passport\nNumber: PA1234567",
+      "expiry": "2032-03-15",
+      "level": 4,
+      "parentIds": ["passports"],
+      "hasChildren": false
+    },
+    {
+      "id": "gemma-passport",
+      "label": "Gemma's Passport",
+      "type": "document",
+      "description": "Australian Passport\nNumber: PA7654321",
+      "expiry": "2031-11-22",
+      "level": 4,
+      "parentIds": ["passports"],
+      "hasChildren": false
+    }
+  ],
+  "relationships": [
+    {
+      "id": "brett-home",
+      "source": "brett",
+      "target": "home"
+    },
+    {
+      "id": "gemma-home",
+      "source": "gemma",
+      "target": "home"
+    },
+    {
+      "id": "brett-docs",
+      "source": "brett",
+      "target": "family-docs"
+    },
+    {
+      "id": "gemma-docs",
+      "source": "gemma",
+      "target": "family-docs"
+    },
+    {
+      "id": "home-insurance",
+      "source": "home",
+      "target": "insurance"
+    },
+    {
+      "id": "home-cleaner",
+      "source": "home",
+      "target": "cleaner"
+    },
+    {
+      "id": "home-gardener",
+      "source": "home",
+      "target": "gardener"
+    },
+    {
+      "id": "docs-passports",
+      "source": "family-docs",
+      "target": "passports"
+    },
+    {
+      "id": "docs-medicare",
+      "source": "family-docs",
+      "target": "medicare"
+    },
+    {
+      "id": "docs-health",
+      "source": "family-docs",
+      "target": "health-insurance"
+    },
+    {
+      "id": "passports-brett",
+      "source": "passports",
+      "target": "brett-passport"
+    },
+    {
+      "id": "passports-gemma",
+      "source": "passports",
+      "target": "gemma-passport"
+    }
+  ]
+}
