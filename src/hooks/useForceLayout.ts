@@ -26,11 +26,44 @@ export function useForceLayout(
   const [isSimulating, setIsSimulating] = useState(false);
   const animationFrameRef = useRef<number | null>(null);
   const nodesCacheRef = useRef<Node[]>([]);
+  const nodesRef = useRef<Node[]>(nodes);
+  const edgesRef = useRef<Edge[]>(edges);
+  const isRunningRef = useRef(false);
+
+  // Update refs when props change
+  useEffect(() => {
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+  }, [nodes, edges]);
 
   // Initialize and run simulation
   const runSimulation = useCallback((preserveManualPositions = true) => {
-    console.log('runSimulation called:', { enabled, nodesLength: nodes.length, edgesLength: edges.length });
-    if (!enabled || nodes.length === 0) return;
+    // Prevent multiple simultaneous runs
+    if (isRunningRef.current) {
+      console.log('Simulation already running, skipping...');
+      return;
+    }
+    
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    
+    // Transform edges to ensure source/target are string IDs for d3-force
+    const d3Edges = currentEdges.map(edge => ({
+      ...edge,
+      source: typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source,
+      target: typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target,
+    }));
+    
+    console.log('runSimulation called:', { 
+      enabled, 
+      nodesLength: currentNodes.length, 
+      edgesLength: currentEdges.length,
+      d3EdgesLength: d3Edges.length,
+      sampleEdge: d3Edges[0]
+    });
+    if (!enabled || currentNodes.length === 0) return;
+
+    isRunningRef.current = true;
 
     // Stop any existing simulation
     if (simulationRef.current) {
@@ -40,17 +73,22 @@ export function useForceLayout(
     setIsSimulating(true);
 
     // Update nodes cache
-    nodesCacheRef.current = nodes;
+    nodesCacheRef.current = currentNodes;
 
     // Prepare nodes with initial positions
     const initialNodes = preserveManualPositions 
-      ? nodes 
-      : getInitialPositions(nodes, layoutOptions.centerX || 600, layoutOptions.centerY || 400);
+      ? currentNodes 
+      : getInitialPositions(currentNodes, layoutOptions.centerX || 600, layoutOptions.centerY || 400);
+    
+    console.log('Using initial positions:', { 
+      preserveManualPositions, 
+      sampleNode: initialNodes[0]?.position 
+    });
 
     // Apply force layout
     const simulation = applyForceLayout(
       initialNodes,
-      edges,
+      d3Edges,
       layoutOptions,
       animate ? (simulationNodes) => {
         // Update positions on each tick if animating
@@ -75,6 +113,7 @@ export function useForceLayout(
       (simulationNodes) => {
         // Simulation ended
         setIsSimulating(false);
+        isRunningRef.current = false;
         
         // Final position update
         const finalNodes = updateNodePositions(nodesCacheRef.current, simulationNodes);
@@ -91,11 +130,12 @@ export function useForceLayout(
     // If not animating, run simulation synchronously
     if (!animate) {
       simulation.tick(layoutOptions.iterations || 300);
-      const finalNodes = updateNodePositions(nodes, simulation.nodes());
+      const finalNodes = updateNodePositions(currentNodes, simulation.nodes());
       setNodes(finalNodes);
       setIsSimulating(false);
+      isRunningRef.current = false;
     }
-  }, [enabled, nodes, edges, animate, layoutOptions, setNodes, onSimulationEnd]);
+  }, [enabled, animate, layoutOptions, setNodes, onSimulationEnd]); // Removed nodes and edges dependencies
 
   // Stop simulation
   const stopSimulation = useCallback(() => {
@@ -108,6 +148,7 @@ export function useForceLayout(
       animationFrameRef.current = null;
     }
     setIsSimulating(false);
+    isRunningRef.current = false;
   }, []);
 
   // Restart simulation
@@ -141,7 +182,7 @@ export function useForceLayout(
       simulation.alphaTarget(0);
       
       // Mark as manually positioned
-      const updatedNodes = nodes.map(n => 
+      const updatedNodes = nodesRef.current.map(n => 
         n.id === node.id 
           ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
           : n
@@ -152,7 +193,7 @@ export function useForceLayout(
       simNode.fx = node.position.x;
       simNode.fy = node.position.y;
     }
-  }, [nodes, setNodes]);
+  }, [setNodes]);
 
   // Update nodes cache when nodes change
   useEffect(() => {

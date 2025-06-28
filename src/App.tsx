@@ -12,6 +12,7 @@ import ReactFlow, {
   Handle,
   Position,
   Node,
+  Edge,
   NodeTypes,
   BackgroundVariant,
   useReactFlow,
@@ -383,6 +384,7 @@ const nodeTypes: NodeTypes = {
 function DocumentGraphInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [originalEdges, setOriginalEdges] = useState<Edge[]>([]); // Store original edges with string IDs
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -424,10 +426,9 @@ function DocumentGraphInner() {
   
   // Calculate visible nodes and filtered edges for force layout
   const visibleNodeIds = new Set(nodes.map(n => n.id));
-  const visibleEdges = edges.filter(edge => {
-    const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source;
-    const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target;
-    return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+  // Use original edges which have string IDs
+  const visibleEdges = originalEdges.filter(edge => {
+    return visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target);
   });
   
   // Force layout hook
@@ -857,7 +858,16 @@ function DocumentGraphInner() {
     
     if (newLayoutType === 'force') {
       setForceEnabled(true);
-      // Don't need setTimeout here since useEffect will handle it
+      // Reset positions for force layout (except manually positioned nodes)
+      const resetNodes = nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          // Keep manual positioning flag
+          isManuallyPositioned: (node.data as NodeData).isManuallyPositioned
+        }
+      }));
+      setNodes(resetNodes);
     } else {
       setForceEnabled(false);
       stopSimulation();
@@ -865,7 +875,7 @@ function DocumentGraphInner() {
       const layoutedNodes = autoLayout(allNodesData, true);
       setAllNodesData(layoutedNodes);
     }
-  }, [allNodesData, stopSimulation, nodes.length, edges.length, visibleEdges.length]);
+  }, [allNodesData, stopSimulation, nodes, setNodes]);
   
   const onConnect = useCallback(
     (_params: Connection) => {
@@ -934,9 +944,10 @@ function DocumentGraphInner() {
     setNodes(initialVisibleNodes);
     
     // Create edges from relationships
-    const edges = dataService.relationshipsToEdges();
-    console.log('Loaded edges from data service:', edges.length);
-    setEdges(edges);
+    const edgesFromService = dataService.relationshipsToEdges();
+    console.log('Loaded edges from data service:', edgesFromService.length);
+    setOriginalEdges(edgesFromService); // Store original edges
+    setEdges(edgesFromService);
   }, [setNodes, setEdges]);
   
   // Cleanup timeout on unmount
@@ -949,20 +960,28 @@ function DocumentGraphInner() {
   }, []);
   
   // Trigger force simulation when enabled
+  const hasTriggeredRef = useRef(false);
   React.useEffect(() => {
-    if (layoutType === 'force' && forceEnabled && nodes.length > 0) {
-      console.log('Triggering force simulation with:', { 
-        nodes: nodes.length, 
-        visibleEdges: visibleEdges.length,
-        firstEdge: visibleEdges[0]
-      });
-      // Small delay to ensure nodes are rendered
-      const timer = setTimeout(() => {
-        runSimulation(true);
-      }, 200);
-      return () => clearTimeout(timer);
+    if (layoutType === 'force' && forceEnabled && nodes.length > 0 && !isSimulating) {
+      // Reset trigger flag when layout type changes
+      if (layoutType === 'force' && !hasTriggeredRef.current) {
+        hasTriggeredRef.current = true;
+        console.log('Triggering force simulation with:', { 
+          nodes: nodes.length, 
+          visibleEdges: visibleEdges.length,
+          firstEdge: visibleEdges[0]
+        });
+        // Small delay to ensure nodes are rendered
+        const timer = setTimeout(() => {
+          // Don't preserve positions on initial force layout
+          runSimulation(false);
+        }, 200);
+        return () => clearTimeout(timer);
+      }
+    } else if (layoutType !== 'force') {
+      hasTriggeredRef.current = false;
     }
-  }, [layoutType, forceEnabled, nodes.length, visibleEdges.length, runSimulation]);
+  }, [layoutType, forceEnabled, nodes.length, isSimulating, runSimulation]); // Added isSimulating to prevent re-triggering
 
   // Fit view to show all level 1 nodes when they change
   React.useEffect(() => {
@@ -1059,11 +1078,19 @@ useEffect(() => {
   
   // Use the same filtered edges that were passed to force layout
   const displayNodeIds = new Set(nodesToDisplay.map(n => n.id));
-  const filteredEdges = edges.filter(edge => {
-    const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source;
-    const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target;
-    return displayNodeIds.has(sourceId) && displayNodeIds.has(targetId);
-  });
+  // Use original edges to ensure we have string IDs
+  const filteredEdges = originalEdges.filter(edge => {
+    return displayNodeIds.has(edge.source) && displayNodeIds.has(edge.target);
+  }).map(edge => ({
+    ...edge,
+    type: 'smoothstep',
+    animated: false,
+    style: {
+      stroke: darkMode ? '#6b7280' : '#9ca3af',
+      strokeWidth: 2,
+      opacity: 0.8,
+    },
+  }));
   
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
