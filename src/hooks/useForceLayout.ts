@@ -29,6 +29,7 @@ export function useForceLayout(
 
   // Initialize and run simulation
   const runSimulation = useCallback((preserveManualPositions = true) => {
+    console.log('runSimulation called:', { enabled, nodesLength: nodes.length, edgesLength: edges.length });
     if (!enabled || nodes.length === 0) return;
 
     // Stop any existing simulation
@@ -37,6 +38,9 @@ export function useForceLayout(
     }
 
     setIsSimulating(true);
+
+    // Update nodes cache
+    nodesCacheRef.current = nodes;
 
     // Prepare nodes with initial positions
     const initialNodes = preserveManualPositions 
@@ -56,6 +60,9 @@ export function useForceLayout(
         
         animationFrameRef.current = requestAnimationFrame(() => {
           const updatedNodes = updateNodePositions(nodesCacheRef.current, simulationNodes);
+          console.log('Tick update:', { 
+            firstNode: simulationNodes[0] ? { id: simulationNodes[0].id, x: simulationNodes[0].x, y: simulationNodes[0].y } : null 
+          });
           nodesCacheRef.current = updatedNodes;
           setNodes(updatedNodes);
         });

@@ -848,11 +848,16 @@ function DocumentGraphInner() {
   
   // Handle layout type change
   const handleLayoutChange = useCallback((newLayoutType: 'sector' | 'force') => {
+    console.log('Layout change to:', newLayoutType);
+    console.log('Current nodes:', nodes.length);
+    console.log('Current edges:', edges.length);
+    console.log('Visible edges:', visibleEdges.length);
+    
     setLayoutType(newLayoutType);
     
     if (newLayoutType === 'force') {
       setForceEnabled(true);
-      setTimeout(() => restartSimulation(true), 100);
+      // Don't need setTimeout here since useEffect will handle it
     } else {
       setForceEnabled(false);
       stopSimulation();
@@ -860,7 +865,7 @@ function DocumentGraphInner() {
       const layoutedNodes = autoLayout(allNodesData, true);
       setAllNodesData(layoutedNodes);
     }
-  }, [allNodesData, restartSimulation, stopSimulation]);
+  }, [allNodesData, stopSimulation, nodes.length, edges.length, visibleEdges.length]);
   
   const onConnect = useCallback(
     (_params: Connection) => {
@@ -945,10 +950,19 @@ function DocumentGraphInner() {
   
   // Trigger force simulation when enabled
   React.useEffect(() => {
-    if (layoutType === 'force' && forceEnabled && nodes.length > 0 && !isSimulating) {
-      runSimulation(true);
+    if (layoutType === 'force' && forceEnabled && nodes.length > 0) {
+      console.log('Triggering force simulation with:', { 
+        nodes: nodes.length, 
+        visibleEdges: visibleEdges.length,
+        firstEdge: visibleEdges[0]
+      });
+      // Small delay to ensure nodes are rendered
+      const timer = setTimeout(() => {
+        runSimulation(true);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [layoutType, forceEnabled, nodes.length, runSimulation, isSimulating]);
+  }, [layoutType, forceEnabled, nodes.length, visibleEdges.length, runSimulation]);
 
   // Fit view to show all level 1 nodes when they change
   React.useEffect(() => {
@@ -1176,7 +1190,15 @@ useEffect(() => {
               {layoutType === 'force' && (
                 <>
                   <button
-                    onClick={() => setForceEnabled(!forceEnabled)}
+                    onClick={() => {
+                      if (forceEnabled) {
+                        setForceEnabled(false);
+                        stopSimulation();
+                      } else {
+                        setForceEnabled(true);
+                        setTimeout(() => restartSimulation(true), 100);
+                      }
+                    }}
                     className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 transition-colors ${
                       forceEnabled ? 'text-green-600' : 'text-gray-500'
                     }`}

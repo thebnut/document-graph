@@ -152,6 +152,7 @@ export function applyForceLayout(
   onEnd?: (nodes: SimulationNode[]) => void
 ): d3.Simulation<SimulationNode, undefined> {
   const opts = { ...defaultOptions, ...options };
+  console.log('applyForceLayout called:', { nodesCount: nodes.length, edgesCount: edges.length });
 
   // Convert ReactFlow nodes to simulation nodes
   const simNodes: SimulationNode[] = nodes.map(node => ({
@@ -167,11 +168,11 @@ export function applyForceLayout(
 
   // Initialize simulation
   const simulation = d3.forceSimulation<SimulationNode>(simNodes)
-    .force('link', d3.forceLink<SimulationNode, Edge>(edges)
+    .force('link', edges.length > 0 ? d3.forceLink<SimulationNode, Edge>(edges)
       .id((d) => d.id)
       .distance(opts.distance)
       .strength(0.1)
-    )
+    : null)
     .force('charge', d3.forceManyBody<SimulationNode>()
       .strength(opts.nodeRepulsion)
       .distanceMax(500)
