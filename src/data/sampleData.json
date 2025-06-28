@@ -104,7 +104,13 @@
       "expiry": "2032-03-15",
       "level": 4,
       "parentIds": ["passports"],
-      "hasChildren": false
+      "hasChildren": false,
+      "documentPath": "/documents/brett passport.jpeg",
+      "documentType": "image",
+      "documentMetadata": {
+        "fileName": "brett passport.jpeg",
+        "mimeType": "image/jpeg"
+      }
     },
     {
       "id": "gemma-passport",
@@ -114,7 +120,13 @@
       "expiry": "2031-11-22",
       "level": 4,
       "parentIds": ["passports"],
-      "hasChildren": false
+      "hasChildren": false,
+      "documentPath": "/documents/gemma passport.jpeg",
+      "documentType": "image",
+      "documentMetadata": {
+        "fileName": "gemma passport.jpeg",
+        "mimeType": "image/jpeg"
+      }
     }
   ],
   "relationships": [

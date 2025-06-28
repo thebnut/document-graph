@@ -14,6 +14,15 @@ export interface Entity {
   level: number;
   parentIds?: string[];
   hasChildren?: boolean;
+  // Document reference fields
+  documentPath?: string;
+  documentType?: 'image' | 'pdf' | 'other';
+  documentMetadata?: {
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    [key: string]: any;
+  };
   // Additional metadata that might be needed
   metadata?: {
     [key: string]: any;

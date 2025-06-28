@@ -45,6 +45,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService';
+import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
+import { DocumentViewer } from './components/DocumentViewer';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -321,6 +323,9 @@ function DocumentGraphInner() {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reactFlowInstance = useReactFlow();
+  const { openDocument } = useDocumentViewer();
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   
   // Store all nodes data
   const [allNodesData, setAllNodesData] = useState<Node[]>([]);
@@ -523,10 +528,21 @@ function DocumentGraphInner() {
     });
   }, []);
 
-  // Handle tooltip hide
+  // Handle tooltip hide with delay
   const handleHideTooltip = useCallback(() => {
-    setTooltipState(prev => ({ ...prev, show: false }));
-  }, []);
+    // Clear any existing timeout
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    
+    // Set a delay before hiding to allow moving to tooltip
+    tooltipTimeoutRef.current = setTimeout(() => {
+      // Only hide if tooltip is not being hovered
+      if (!isTooltipHovered) {
+        setTooltipState(prev => ({ ...prev, show: false }));
+      }
+    }, 150); // 150ms delay to move cursor to tooltip
+  }, [isTooltipHovered]);
 
   // Handle reset canvas
   const handleResetCanvas = useCallback(() => {
@@ -627,6 +643,15 @@ function DocumentGraphInner() {
     console.log('Loaded edges from data service:', edges.length);
     setEdges(edges);
   }, [setNodes, setEdges]);
+  
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // Update node expansion state and visibility
 useEffect(() => {
@@ -878,11 +903,24 @@ useEffect(() => {
         {/* Portal tooltip */}
         {tooltipState.show && tooltipState.data && createPortal(
           <div 
-            className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 min-w-[250px] border border-gray-200 dark:border-gray-700 pointer-events-none"
+            className={`fixed z-[9999] bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 min-w-[250px] border border-gray-200 dark:border-gray-700`}
             style={{
               left: `${tooltipState.position.x}px`,
               top: `${tooltipState.position.y}px`,
               transform: 'translateX(-50%)'
+            }}
+            onMouseEnter={() => {
+              // Clear any hide timeout when entering tooltip
+              if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+                tooltipTimeoutRef.current = null;
+              }
+              setIsTooltipHovered(true);
+            }}
+            onMouseLeave={() => {
+              setIsTooltipHovered(false);
+              // Hide tooltip when leaving
+              setTooltipState(prev => ({ ...prev, show: false }));
             }}
           >
             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-l border-t border-gray-200 dark:border-gray-700"></div>
@@ -894,9 +932,27 @@ useEffect(() => {
             {tooltipState.data.source && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {tooltipState.data.source}</p>
             )}
+            {tooltipState.data.documentPath && (
+              <button
+                onClick={() => {
+                  const entity = dataService.getEntityById(tooltipState.nodeId!);
+                  if (entity) {
+                    openDocument(entity);
+                    handleHideTooltip();
+                  }
+                }}
+                className="mt-3 w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Open Document
+              </button>
+            )}
           </div>,
           document.body
         )}
+        
+        {/* Document Viewer */}
+        <DocumentViewer darkMode={darkMode} />
       </div>
     </div>
   );
@@ -905,9 +961,11 @@ useEffect(() => {
 // Wrapper component
 function DocumentGraphApp() {
   return (
-    <ReactFlowProvider>
-      <DocumentGraphInner />
-    </ReactFlowProvider>
+    <DocumentViewerProvider>
+      <ReactFlowProvider>
+        <DocumentGraphInner />
+      </ReactFlowProvider>
+    </DocumentViewerProvider>
   );
 }
 
