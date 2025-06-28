@@ -168,11 +168,6 @@ export function applyForceLayout(
 
   // Initialize simulation
   const simulation = d3.forceSimulation<SimulationNode>(simNodes)
-    .force('link', edges.length > 0 ? d3.forceLink<SimulationNode, Edge>(edges)
-      .id((d) => d.id)
-      .distance(opts.distance)
-      .strength(0.1)
-    : null)
     .force('charge', d3.forceManyBody<SimulationNode>()
       .strength(opts.nodeRepulsion)
       .distanceMax(500)
@@ -182,10 +177,32 @@ export function applyForceLayout(
     .force('levels', levelForce(opts.levelSeparation, opts.centerY))
     .alphaDecay(opts.alphaDecay)
     .velocityDecay(opts.velocityDecay);
+  
+  // Add link force only if there are edges
+  if (edges.length > 0) {
+    simulation.force('link', d3.forceLink<SimulationNode, Edge>(edges)
+      .id((d) => d.id)
+      .distance(opts.distance)
+      .strength(0.1)
+    );
+  }
+  
+  console.log('Simulation forces:', {
+    hasLink: edges.length > 0,
+    charge: true,
+    center: true,
+    collision: true,
+    levels: true
+  });
 
   // Handle tick events
+  let tickCount = 0;
   if (onTick) {
     simulation.on('tick', () => {
+      tickCount++;
+      if (tickCount <= 5 || tickCount % 50 === 0) {
+        console.log(`Tick ${tickCount}, alpha: ${simulation.alpha()}`);
+      }
       onTick(simNodes);
     });
   }
@@ -197,10 +214,8 @@ export function applyForceLayout(
     });
   }
 
-  // Stop after max iterations
-  let tickCount = 0;
-  simulation.on('tick', () => {
-    tickCount++;
+  // Stop after max iterations (using tickCount from above)
+  simulation.on('tick.stop', () => {
     if (tickCount >= opts.iterations) {
       simulation.stop();
     }

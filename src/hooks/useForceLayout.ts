@@ -60,9 +60,14 @@ export function useForceLayout(
         
         animationFrameRef.current = requestAnimationFrame(() => {
           const updatedNodes = updateNodePositions(nodesCacheRef.current, simulationNodes);
-          console.log('Tick update:', { 
-            firstNode: simulationNodes[0] ? { id: simulationNodes[0].id, x: simulationNodes[0].x, y: simulationNodes[0].y } : null 
-          });
+          if (simulationNodes[0]) {
+            console.log('Tick update:', { 
+              id: simulationNodes[0].id, 
+              x: simulationNodes[0].x, 
+              y: simulationNodes[0].y,
+              nodesUpdated: updatedNodes.length
+            });
+          }
           nodesCacheRef.current = updatedNodes;
           setNodes(updatedNodes);
         });

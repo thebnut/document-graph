@@ -425,8 +425,8 @@ function DocumentGraphInner() {
   // Calculate visible nodes and filtered edges for force layout
   const visibleNodeIds = new Set(nodes.map(n => n.id));
   const visibleEdges = edges.filter(edge => {
-    const sourceId = typeof edge.source === 'string' ? edge.source : edge.source;
-    const targetId = typeof edge.target === 'string' ? edge.target : edge.target;
+    const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source;
+    const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target;
     return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
   });
   
@@ -1060,8 +1060,8 @@ useEffect(() => {
   // Use the same filtered edges that were passed to force layout
   const displayNodeIds = new Set(nodesToDisplay.map(n => n.id));
   const filteredEdges = edges.filter(edge => {
-    const sourceId = typeof edge.source === 'string' ? edge.source : edge.source;
-    const targetId = typeof edge.target === 'string' ? edge.target : edge.target;
+    const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source;
+    const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target;
     return displayNodeIds.has(sourceId) && displayNodeIds.has(targetId);
   });
   
