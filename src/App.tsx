@@ -177,7 +177,7 @@ const EntityNode = ({
   data: NodeData; 
   id: string;
   onShowTooltip: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
-  onHideTooltip: () => void;
+  onHideTooltip: (nodeId?: string) => void;
 }) => {
   
   // Different sizes for different node types
@@ -250,8 +250,29 @@ const EntityNode = ({
     <div className="relative">
       <div
         className={`${getNodeSize()} ${getNodeColor()} text-white rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:shadow-2xl hover:scale-110 flex flex-col items-center justify-center p-3 border-2 border-white/20 relative`}
-        onMouseEnter={(e) => data.description && onShowTooltip(id, data, e)}
-        onMouseLeave={() => onHideTooltip()}
+        onMouseEnter={(e) => {
+          if (data.onSetHoveredNodeId) {
+            data.onSetHoveredNodeId(id);
+          }
+          if (data.description) {
+            onShowTooltip(id, data, e);
+          }
+        }}
+        onMouseLeave={() => {
+          if (data.onSetHoveredNodeId) {
+            data.onSetHoveredNodeId(null);
+          }
+          onHideTooltip(id);
+        }}
+        onMouseMove={(e) => {
+          // Keep showing tooltip on mouse move
+          if (data.description) {
+            // Keep tooltip visible when moving within the node
+            if (!data.tooltipNodeId || data.tooltipNodeId !== id) {
+              onShowTooltip(id, data, e);
+            }
+          }
+        }}
       >
         <div className="flex flex-col items-center gap-1">
           {getIcon()}
@@ -514,9 +535,13 @@ function DocumentGraphInner() {
     }
   }, [allNodesData, reactFlowInstance, getAllDescendantIds]);
   
+  // Track current hovered node ID
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   // Handle tooltip show
   const handleShowTooltip = useCallback((nodeId: string, nodeData: NodeData, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
+    setHoveredNodeId(nodeId);
     setTooltipState({
       show: true,
       nodeId,
@@ -529,7 +554,12 @@ function DocumentGraphInner() {
   }, []);
 
   // Handle tooltip hide with delay
-  const handleHideTooltip = useCallback(() => {
+  const handleHideTooltip = useCallback((nodeId?: string) => {
+    // If leaving a specific node, update hoveredNodeId
+    if (nodeId) {
+      setHoveredNodeId(null);
+    }
+    
     // Clear any existing timeout
     if (tooltipTimeoutRef.current) {
       clearTimeout(tooltipTimeoutRef.current);
@@ -537,12 +567,12 @@ function DocumentGraphInner() {
     
     // Set a delay before hiding to allow moving to tooltip
     tooltipTimeoutRef.current = setTimeout(() => {
-      // Only hide if tooltip is not being hovered
-      if (!isTooltipHovered) {
+      // Only hide if tooltip is not being hovered and no node is being hovered
+      if (!isTooltipHovered && !hoveredNodeId) {
         setTooltipState(prev => ({ ...prev, show: false }));
       }
-    }, 150); // 150ms delay to move cursor to tooltip
-  }, [isTooltipHovered]);
+    }, 100); // 100ms delay to move cursor to tooltip
+  }, [isTooltipHovered, hoveredNodeId]);
 
   // Handle reset canvas
   const handleResetCanvas = useCallback(() => {
@@ -714,7 +744,9 @@ useEffect(() => {
     data: {
       ...node.data,
       onShowTooltip: handleShowTooltip,
-      onHideTooltip: handleHideTooltip
+      onHideTooltip: handleHideTooltip,
+      onSetHoveredNodeId: setHoveredNodeId,
+      tooltipNodeId: tooltipState.nodeId
     }
   }));
   
@@ -723,7 +755,9 @@ useEffect(() => {
     data: {
       ...node.data,
       onShowTooltip: handleShowTooltip,
-      onHideTooltip: handleHideTooltip
+      onHideTooltip: handleHideTooltip,
+      onSetHoveredNodeId: setHoveredNodeId,
+      tooltipNodeId: tooltipState.nodeId
     }
   }));
   

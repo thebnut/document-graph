@@ -4,7 +4,9 @@ import sampleData from '../data/sampleData.json';
 
 export interface NodeData extends EntityWithComputed {
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
-  onHideTooltip?: () => void;
+  onHideTooltip?: (nodeId?: string) => void;
+  onSetHoveredNodeId?: (nodeId: string | null) => void;
+  tooltipNodeId?: string | null;
 }
 
 export class DataService {
