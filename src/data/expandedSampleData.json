@@ -1,0 +1,657 @@
+{
+  "version": "2.0.0",
+  "metadata": {
+    "created": "2024-12-01T00:00:00Z",
+    "modified": "2024-12-01T00:00:00Z",
+    "description": "Expanded family document graph with comprehensive categorization"
+  },
+  "entities": [
+    {
+      "id": "brett",
+      "label": "Brett Thebault",
+      "type": "person",
+      "description": "Father, primary account holder",
+      "level": 1,
+      "hasChildren": true
+    },
+    {
+      "id": "gemma",
+      "label": "Gemma Thebault",
+      "type": "person",
+      "description": "Mother, primary account holder",
+      "level": 1,
+      "hasChildren": true
+    },
+    {
+      "id": "freya",
+      "label": "Freya Thebault",
+      "type": "person",
+      "description": "Daughter",
+      "level": 1,
+      "hasChildren": true
+    },
+    {
+      "id": "anya",
+      "label": "Anya Thebault",
+      "type": "person",
+      "description": "Daughter",
+      "level": 1,
+      "hasChildren": true
+    },
+    
+    {
+      "id": "brett-identity",
+      "label": "Identity",
+      "type": "folder",
+      "subtype": "identity",
+      "description": "Brett's identity documents",
+      "level": 2,
+      "parentIds": ["brett"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    {
+      "id": "brett-health",
+      "label": "Health",
+      "type": "folder",
+      "subtype": "health",
+      "description": "Brett's health records",
+      "level": 2,
+      "parentIds": ["brett"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    {
+      "id": "brett-finance",
+      "label": "Finance",
+      "type": "folder",
+      "subtype": "financial",
+      "description": "Brett's financial documents",
+      "level": 2,
+      "parentIds": ["brett"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    
+    {
+      "id": "gemma-identity",
+      "label": "Identity",
+      "type": "folder",
+      "subtype": "identity",
+      "description": "Gemma's identity documents",
+      "level": 2,
+      "parentIds": ["gemma"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    {
+      "id": "gemma-health",
+      "label": "Health",
+      "type": "folder",
+      "subtype": "health",
+      "description": "Gemma's health records",
+      "level": 2,
+      "parentIds": ["gemma"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    
+    {
+      "id": "freya-identity",
+      "label": "Identity",
+      "type": "folder",
+      "subtype": "identity",
+      "description": "Freya's identity documents",
+      "level": 2,
+      "parentIds": ["freya"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    {
+      "id": "freya-health",
+      "label": "Health",
+      "type": "folder",
+      "subtype": "health",
+      "description": "Freya's health records",
+      "level": 2,
+      "parentIds": ["freya"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    
+    {
+      "id": "anya-identity",
+      "label": "Identity",
+      "type": "folder",
+      "subtype": "identity",
+      "description": "Anya's identity documents",
+      "level": 2,
+      "parentIds": ["anya"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    {
+      "id": "anya-health",
+      "label": "Health",
+      "type": "folder",
+      "subtype": "health",
+      "description": "Anya's health records",
+      "level": 2,
+      "parentIds": ["anya"],
+      "hasChildren": true,
+      "ownership": "individual"
+    },
+    
+    {
+      "id": "tesla-model-3",
+      "label": "Tesla Model 3",
+      "type": "asset",
+      "subtype": "vehicle",
+      "description": "2021 Tesla Model 3 - Brett's vehicle",
+      "level": 2,
+      "parentIds": ["brett"],
+      "hasChildren": true,
+      "ownership": "individual",
+      "metadata": {
+        "make": "Tesla",
+        "model": "Model 3",
+        "year": 2021
+      }
+    },
+    {
+      "id": "tesla-model-y",
+      "label": "Tesla Model Y",
+      "type": "asset",
+      "subtype": "vehicle",
+      "description": "2023 Tesla Model Y - Gemma's vehicle",
+      "level": 2,
+      "parentIds": ["gemma"],
+      "hasChildren": true,
+      "ownership": "individual",
+      "metadata": {
+        "make": "Tesla",
+        "model": "Model Y",
+        "year": 2023
+      }
+    },
+    
+    {
+      "id": "brett-passport",
+      "label": "Passport",
+      "type": "document",
+      "category": "passport",
+      "description": "Australian Passport",
+      "level": 3,
+      "parentIds": ["brett-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Identity/Brett passport.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Brett passport.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "passportNumber": "PA1234567",
+        "expiryDate": "2032-03-15",
+        "country": "Australia",
+        "isPrimary": true
+      }
+    },
+    {
+      "id": "brett-drivers-licence",
+      "label": "Driver's Licence",
+      "type": "document",
+      "category": "drivers-licence",
+      "description": "Queensland Driver's Licence",
+      "expiry": "2029-10-15",
+      "level": 3,
+      "parentIds": ["brett-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Identity/Brett drivers license oct24.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Brett drivers license oct24.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "licenceNumber": "123456789",
+        "expiryDate": "2029-10-15",
+        "class": "C",
+        "stateIssued": "QLD"
+      }
+    },
+    
+    {
+      "id": "brett-dexa-may-2023",
+      "label": "DEXA Scan May 2023",
+      "type": "document",
+      "category": "imaging-reports",
+      "description": "Bone density scan",
+      "level": 3,
+      "parentIds": ["brett-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Health/Dexa May 2023 Brett.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Dexa May 2023 Brett.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "type": "DEXA Scan",
+        "date": "2023-05-15",
+        "clinic": "Queensland X-Ray",
+        "notes": "Bone density assessment"
+      }
+    },
+    {
+      "id": "brett-dexa-nov-2024",
+      "label": "DEXA Scan Nov 2024",
+      "type": "document",
+      "category": "imaging-reports",
+      "description": "Bone density scan follow-up",
+      "level": 3,
+      "parentIds": ["brett-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Health/Dexa nov 2024 Brett.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Dexa nov 2024 Brett.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "type": "DEXA Scan",
+        "date": "2024-11-20",
+        "clinic": "Queensland X-Ray",
+        "notes": "Follow-up bone density assessment"
+      }
+    },
+    
+    {
+      "id": "brett-bank-accounts",
+      "label": "Bank Accounts",
+      "type": "document",
+      "category": "bank-accounts",
+      "description": "Westpac banking details",
+      "level": 3,
+      "parentIds": ["brett-finance"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Finance/Westpac bank accounts.png",
+      "documentType": "image",
+      "documentMetadata": {
+        "fileName": "Westpac bank accounts.png",
+        "mimeType": "image/png"
+      },
+      "metadata": {
+        "bank": "Westpac",
+        "accountType": "Multiple accounts"
+      }
+    },
+    
+    {
+      "id": "gemma-passport",
+      "label": "Passport",
+      "type": "document",
+      "category": "passport",
+      "description": "Australian Passport",
+      "level": 3,
+      "parentIds": ["gemma-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Gemma Thebault/Identity/Gemma passport.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Gemma passport.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "passportNumber": "PA7654321",
+        "expiryDate": "2031-11-22",
+        "country": "Australia",
+        "isPrimary": true
+      }
+    },
+    
+    {
+      "id": "gemma-dexa-may-2023",
+      "label": "DEXA Scan May 2023",
+      "type": "document",
+      "category": "imaging-reports",
+      "description": "Bone density scan",
+      "level": 3,
+      "parentIds": ["gemma-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Gemma Thebault/Health/Dexa May 2023 Gemma.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Dexa May 2023 Gemma.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "type": "DEXA Scan",
+        "date": "2023-05-15",
+        "clinic": "Queensland X-Ray",
+        "notes": "Bone density assessment"
+      }
+    },
+    {
+      "id": "gemma-dexa-nov-2024",
+      "label": "DEXA Scan Nov 2024",
+      "type": "document",
+      "category": "imaging-reports",
+      "description": "Bone density scan follow-up",
+      "level": 3,
+      "parentIds": ["gemma-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Gemma Thebault/Health/Dexa nov 2024 Gemma.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Dexa nov 2024 Gemma.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "type": "DEXA Scan",
+        "date": "2024-11-20",
+        "clinic": "Queensland X-Ray",
+        "notes": "Follow-up bone density assessment"
+      }
+    },
+    
+    {
+      "id": "freya-passport",
+      "label": "Passport",
+      "type": "document",
+      "category": "passport",
+      "description": "Australian Passport",
+      "level": 3,
+      "parentIds": ["freya-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Freya Thebault/Identity/Freya passport.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Freya passport.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "passportNumber": "PA9876543",
+        "expiryDate": "2030-06-30",
+        "country": "Australia",
+        "isPrimary": true
+      }
+    },
+    {
+      "id": "freya-birth-certificate",
+      "label": "Birth Certificate",
+      "type": "document",
+      "category": "birth-certificate",
+      "description": "Queensland Birth Certificate",
+      "level": 3,
+      "parentIds": ["freya-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Freya Thebault/Identity/Freya birth certificate .pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Freya birth certificate .pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "registrationNumber": "2015/123456",
+        "birthDate": "2015-08-15",
+        "placeOfBirth": "Brisbane, QLD"
+      }
+    },
+    
+    {
+      "id": "freya-health-report",
+      "label": "Health Report Apr 2025",
+      "type": "document",
+      "category": "gp",
+      "description": "General health assessment",
+      "level": 3,
+      "parentIds": ["freya-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Freya Thebault/Health/Freya-Report-BBJ9987-28Apr2025 (1).pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Freya-Report-BBJ9987-28Apr2025 (1).pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "date": "2025-04-28",
+        "doctorName": "Dr. Smith",
+        "clinic": "Brisbane Medical Centre",
+        "notes": "Annual check-up"
+      }
+    },
+    
+    {
+      "id": "anya-passport",
+      "label": "Passport",
+      "type": "document",
+      "category": "passport",
+      "description": "Australian Passport",
+      "level": 3,
+      "parentIds": ["anya-identity"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Anya Thebault/Identity/Anya passport.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Anya passport.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "passportNumber": "PA5432109",
+        "expiryDate": "2031-02-28",
+        "country": "Australia",
+        "isPrimary": true
+      }
+    },
+    
+    {
+      "id": "anya-hospital-discharge",
+      "label": "Hospital Discharge - Arm Fracture",
+      "type": "document",
+      "category": "hospital-visits",
+      "description": "Emergency department visit for arm fracture",
+      "level": 3,
+      "parentIds": ["anya-health"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Anya Thebault/Health/Anya discharge arm fracture.pdf",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "Anya discharge arm fracture.pdf",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "hospital": "Queensland Children's Hospital",
+        "admissionDate": "2024-09-15",
+        "dischargeDate": "2024-09-15",
+        "reason": "Right arm fracture - playground accident"
+      }
+    },
+    
+    {
+      "id": "tesla-model-3-insurance",
+      "label": "Car Insurance",
+      "type": "document",
+      "category": "car-insurance",
+      "description": "Tesla Model 3 comprehensive insurance",
+      "level": 3,
+      "parentIds": ["tesla-model-3"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Brett Thebault/Tesla Model 3/PC_0000032058193 (1).PDF",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "PC_0000032058193 (1).PDF",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "provider": "Tesla Insurance",
+        "policyNumber": "PC_0000032058193",
+        "coverageType": "Comprehensive",
+        "expiryDate": "2025-06-30"
+      }
+    },
+    
+    {
+      "id": "tesla-model-y-insurance",
+      "label": "Car Insurance",
+      "type": "document",
+      "category": "car-insurance",
+      "description": "Tesla Model Y comprehensive insurance",
+      "level": 3,
+      "parentIds": ["tesla-model-y"],
+      "hasChildren": false,
+      "documentPath": "/documents/model-expansion/Gemma Thebault/Tesla Model Y/PC_0000033584308.PDF",
+      "documentType": "pdf",
+      "documentMetadata": {
+        "fileName": "PC_0000033584308.PDF",
+        "mimeType": "application/pdf"
+      },
+      "metadata": {
+        "provider": "Tesla Insurance",
+        "policyNumber": "PC_0000033584308",
+        "coverageType": "Comprehensive",
+        "expiryDate": "2025-08-31"
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "id": "brett-identity-rel",
+      "source": "brett",
+      "target": "brett-identity"
+    },
+    {
+      "id": "brett-health-rel",
+      "source": "brett",
+      "target": "brett-health"
+    },
+    {
+      "id": "brett-finance-rel",
+      "source": "brett",
+      "target": "brett-finance"
+    },
+    {
+      "id": "brett-tesla-rel",
+      "source": "brett",
+      "target": "tesla-model-3"
+    },
+    
+    {
+      "id": "gemma-identity-rel",
+      "source": "gemma",
+      "target": "gemma-identity"
+    },
+    {
+      "id": "gemma-health-rel",
+      "source": "gemma",
+      "target": "gemma-health"
+    },
+    {
+      "id": "gemma-tesla-rel",
+      "source": "gemma",
+      "target": "tesla-model-y"
+    },
+    
+    {
+      "id": "freya-identity-rel",
+      "source": "freya",
+      "target": "freya-identity"
+    },
+    {
+      "id": "freya-health-rel",
+      "source": "freya",
+      "target": "freya-health"
+    },
+    
+    {
+      "id": "anya-identity-rel",
+      "source": "anya",
+      "target": "anya-identity"
+    },
+    {
+      "id": "anya-health-rel",
+      "source": "anya",
+      "target": "anya-health"
+    },
+    
+    {
+      "id": "brett-identity-passport-rel",
+      "source": "brett-identity",
+      "target": "brett-passport"
+    },
+    {
+      "id": "brett-identity-licence-rel",
+      "source": "brett-identity",
+      "target": "brett-drivers-licence"
+    },
+    {
+      "id": "brett-health-dexa1-rel",
+      "source": "brett-health",
+      "target": "brett-dexa-may-2023"
+    },
+    {
+      "id": "brett-health-dexa2-rel",
+      "source": "brett-health",
+      "target": "brett-dexa-nov-2024"
+    },
+    {
+      "id": "brett-finance-bank-rel",
+      "source": "brett-finance",
+      "target": "brett-bank-accounts"
+    },
+    
+    {
+      "id": "gemma-identity-passport-rel",
+      "source": "gemma-identity",
+      "target": "gemma-passport"
+    },
+    {
+      "id": "gemma-health-dexa1-rel",
+      "source": "gemma-health",
+      "target": "gemma-dexa-may-2023"
+    },
+    {
+      "id": "gemma-health-dexa2-rel",
+      "source": "gemma-health",
+      "target": "gemma-dexa-nov-2024"
+    },
+    
+    {
+      "id": "freya-identity-passport-rel",
+      "source": "freya-identity",
+      "target": "freya-passport"
+    },
+    {
+      "id": "freya-identity-birth-rel",
+      "source": "freya-identity",
+      "target": "freya-birth-certificate"
+    },
+    {
+      "id": "freya-health-report-rel",
+      "source": "freya-health",
+      "target": "freya-health-report"
+    },
+    
+    {
+      "id": "anya-identity-passport-rel",
+      "source": "anya-identity",
+      "target": "anya-passport"
+    },
+    {
+      "id": "anya-health-hospital-rel",
+      "source": "anya-health",
+      "target": "anya-hospital-discharge"
+    },
+    
+    {
+      "id": "tesla3-insurance-rel",
+      "source": "tesla-model-3",
+      "target": "tesla-model-3-insurance"
+    },
+    {
+      "id": "teslay-insurance-rel",
+      "source": "tesla-model-y",
+      "target": "tesla-model-y-insurance"
+    }
+  ]
+}

@@ -42,11 +42,24 @@ import {
   Phone,
   MapPin,
   DollarSign,
-  RotateCcw
+  RotateCcw,
+  Folder,
+  Baby,
+  HeartPulse,
+  Banknote,
+  IdCard,
+  Hospital,
+  Stethoscope,
+  Zap,
+  Grid3x3,
+  Settings,
+  Play,
+  Pause
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
 import { DocumentViewer } from './components/DocumentViewer';
+import { useForceLayout } from './hooks/useForceLayout';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -206,6 +219,18 @@ const EntityNode = ({
         return 'bg-gradient-to-br from-green-400 to-green-600 hover:from-green-500 hover:to-green-700';
       case 'document':
         return 'bg-gradient-to-br from-purple-400 to-purple-600 hover:from-purple-500 hover:to-purple-700';
+      case 'folder':
+        // Different colors for different folder types
+        switch (data.subtype) {
+          case 'identity':
+            return 'bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700';
+          case 'health':
+            return 'bg-gradient-to-br from-red-400 to-red-600 hover:from-red-500 hover:to-red-700';
+          case 'financial':
+            return 'bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700';
+          default:
+            return 'bg-gradient-to-br from-indigo-400 to-indigo-600 hover:from-indigo-500 hover:to-indigo-700';
+        }
       default:
         return 'bg-gradient-to-br from-gray-400 to-gray-600';
     }
@@ -214,29 +239,64 @@ const EntityNode = ({
   const getIcon = () => {
     const iconClass = data.type === 'person' || data.level === 1 ? 'w-8 h-8' : 'w-6 h-6';
     
+    // Handle folders first
+    if (data.type === 'folder') {
+      switch (data.subtype) {
+        case 'identity':
+          return <IdCard className={iconClass} />;
+        case 'health':
+          return <HeartPulse className={iconClass} />;
+        case 'financial':
+          return <Banknote className={iconClass} />;
+        default:
+          return <Folder className={iconClass} />;
+      }
+    }
+    
+    // Handle specific document categories
+    if (data.category) {
+      switch (data.category) {
+        case 'passport':
+          return <Plane className={iconClass} />;
+        case 'birth-certificate':
+          return <Baby className={iconClass} />;
+        case 'drivers-licence':
+          return <Car className={iconClass} />;
+        case 'hospital-visits':
+          return <Hospital className={iconClass} />;
+        case 'imaging-reports':
+          return <Stethoscope className={iconClass} />;
+        case 'bank-accounts':
+          return <DollarSign className={iconClass} />;
+        case 'car-insurance':
+        case 'insurance':
+          return <Shield className={iconClass} />;
+        case 'gp':
+          return <Heart className={iconClass} />;
+      }
+    }
+    
     // More specific icons based on label content
     const labelLower = data.label.toLowerCase();
     
     // Check for specific document types
     if (labelLower.includes('cleaner')) return <Sparkles className={iconClass} />;
     if (labelLower.includes('gardener')) return <Trees className={iconClass} />;
-    if (labelLower.includes('passport')) return <Plane className={iconClass} />;
-    if (labelLower.includes('insurance')) return <Shield className={iconClass} />;
-    if (labelLower.includes('health')) return <Heart className={iconClass} />;
     if (labelLower.includes('medicare')) return <CreditCard className={iconClass} />;
-    if (labelLower.includes('visa')) return <Plane className={iconClass} />;
-    if (labelLower.includes('birth certificate')) return <FileText className={iconClass} />;
     if (labelLower.includes('document')) return <FolderOpen className={iconClass} />;
     if (labelLower.includes('email')) return <Mail className={iconClass} />;
     if (labelLower.includes('phone')) return <Phone className={iconClass} />;
     if (labelLower.includes('address')) return <MapPin className={iconClass} />;
-    if (labelLower.includes('financial') || labelLower.includes('bank')) return <DollarSign className={iconClass} />;
     if (labelLower.includes('work') || labelLower.includes('employment')) return <Briefcase className={iconClass} />;
     if (labelLower.includes('calendar') || labelLower.includes('schedule')) return <Calendar className={iconClass} />;
     
     // Default icons by type
     switch (data.type) {
       case 'person':
+        // Children vs adults
+        return data.level === 1 && ['Freya', 'Anya'].some(name => data.label.includes(name)) 
+          ? <Baby className={iconClass} /> 
+          : <User className={iconClass} />;
       case 'pet':
         return <User className={iconClass} />;
       case 'asset':
@@ -333,6 +393,17 @@ function DocumentGraphInner() {
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   
+  // Layout state
+  const [layoutType, setLayoutType] = useState<'sector' | 'force'>('sector');
+  const [forceEnabled, setForceEnabled] = useState(false);
+  const [showForceSettings, setShowForceSettings] = useState(false);
+  const [forceOptions, setForceOptions] = useState({
+    strength: -500,
+    distance: 150,
+    nodeRepulsion: -1000,
+    collisionPadding: 20,
+  });
+  
   // Store all nodes data
   const [allNodesData, setAllNodesData] = useState<Node[]>([]);
   
@@ -351,37 +422,134 @@ function DocumentGraphInner() {
     description: '',
   });
   
-  // Auto-layout function with better spacing
+  // Calculate visible nodes and filtered edges for force layout
+  const visibleNodeIds = new Set(nodes.map(n => n.id));
+  const visibleEdges = edges.filter(edge => {
+    const sourceId = typeof edge.source === 'string' ? edge.source : edge.source;
+    const targetId = typeof edge.target === 'string' ? edge.target : edge.target;
+    return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+  });
+  
+  // Force layout hook
+  const {
+    runSimulation,
+    stopSimulation,
+    restartSimulation,
+    handleNodeDrag: forceNodeDrag,
+    handleNodeDragStop: forceNodeDragStop,
+    isSimulating,
+  } = useForceLayout(nodes, visibleEdges, {
+    enabled: forceEnabled && layoutType === 'force',
+    animate: true,
+    ...forceOptions,
+    onSimulationEnd: () => {
+      console.log('Force simulation completed');
+    }
+  });
+  
+  // Auto-layout function with sector-based spacing to prevent overlap
   const autoLayout = (nodes: Node[], preserveManualPositions = false) => {
-    const centerX = 400;
-    const centerY = 300;
-    const level2Radius = 250;
-    const level3Radius = 200;
-    const level4Spacing = 150;
+    const centerX = 600;
+    const centerY = 400;
     
     const layoutNodes = [...nodes];
     
-    // Position level 1 (central) nodes
-    const level1Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 1);
+    // Position level 1 (central) nodes in a square or diamond pattern
+    const level1Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 1)
+      .sort((a, b) => a.id.localeCompare(b.id)); // Sort by ID for consistent ordering
+    const level1Spacing = 200; // Distance between level 1 nodes
+    
+    // Calculate angular sectors for each Level 1 node
+    const sectorMap = new Map<string, { startAngle: number; endAngle: number }>();
+    const sectorAngle = (2 * Math.PI) / level1Nodes.length;
+    
     level1Nodes.forEach((node, index) => {
+      // Calculate sector for this Level 1 node
+      const startAngle = index * sectorAngle - Math.PI / 2; // Start from top
+      const endAngle = startAngle + sectorAngle;
+      sectorMap.set(node.id, { startAngle, endAngle });
+      
       if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        node.position = {
-          x: centerX + (index === 0 ? -100 : 100),
-          y: centerY
-        };
+        // Position nodes in a diamond/square pattern for 4 people
+        if (level1Nodes.length === 4) {
+          switch (index) {
+            case 0: // Top
+              node.position = { x: centerX, y: centerY - level1Spacing };
+              break;
+            case 1: // Right
+              node.position = { x: centerX + level1Spacing, y: centerY };
+              break;
+            case 2: // Bottom
+              node.position = { x: centerX, y: centerY + level1Spacing };
+              break;
+            case 3: // Left
+              node.position = { x: centerX - level1Spacing, y: centerY };
+              break;
+          }
+        } else if (level1Nodes.length === 2) {
+          // Side by side for couples
+          node.position = {
+            x: centerX + (index === 0 ? -level1Spacing/2 : level1Spacing/2),
+            y: centerY
+          };
+        } else {
+          // Arrange in a circle for other counts
+          const angleStep = (2 * Math.PI) / level1Nodes.length;
+          const angle = index * angleStep - Math.PI / 2;
+          const radius = level1Spacing * 0.7;
+          node.position = {
+            x: centerX + Math.cos(angle) * radius,
+            y: centerY + Math.sin(angle) * radius
+          };
+        }
       }
     });
     
-    // Position level 2 nodes in a circle around center
+    // Position level 2 nodes around their parent nodes
+    const level2NodesByParent = new Map<string, Node[]>();
     const level2Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 2);
-    const angleStep2 = (2 * Math.PI) / Math.max(level2Nodes.length, 1);
-    level2Nodes.forEach((node, index) => {
-      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        const angle = index * angleStep2 - Math.PI / 2;
-        node.position = {
-          x: centerX + Math.cos(angle) * level2Radius,
-          y: centerY + Math.sin(angle) * level2Radius
-        };
+    
+    // Group level 2 nodes by their parent
+    level2Nodes.forEach(node => {
+      const parentId = (node.data as NodeData).parentIds?.[0];
+      if (parentId) {
+        if (!level2NodesByParent.has(parentId)) {
+          level2NodesByParent.set(parentId, []);
+        }
+        level2NodesByParent.get(parentId)!.push(node);
+      }
+    });
+    
+    // Position level 2 nodes around their respective parents within sector boundaries
+    level2NodesByParent.forEach((children, parentId) => {
+      const parent = layoutNodes.find(n => n.id === parentId);
+      const sector = sectorMap.get(parentId);
+      
+      if (parent && sector) {
+        // Get the parent's sector boundaries
+        const { startAngle, endAngle } = sector;
+        const sectorWidth = endAngle - startAngle;
+        
+        // Position level 2 nodes within the parent's sector
+        const level2Radius = 350; // Fixed distance from center for all level 2 nodes
+        
+        // Calculate angular positions within the sector
+        const usableSectorWidth = sectorWidth * 0.7; // Use 70% of sector to leave gaps
+        const sectorCenter = (startAngle + endAngle) / 2;
+        const angleStep = children.length > 1 ? usableSectorWidth / (children.length - 1) : 0;
+        const startChildAngle = sectorCenter - usableSectorWidth / 2;
+        
+        children.forEach((node, index) => {
+          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+            const angle = startChildAngle + index * angleStep;
+            
+            // Position at fixed radius from center
+            const x = centerX + Math.cos(angle) * level2Radius;
+            const y = centerY + Math.sin(angle) * level2Radius;
+            
+            node.position = { x, y };
+          }
+        });
       }
     });
     
@@ -402,19 +570,38 @@ function DocumentGraphInner() {
     level3NodesByParent.forEach((children, parentId) => {
       const parent = layoutNodes.find(n => n.id === parentId);
       if (parent) {
-        const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
-        const spreadAngle = Math.min(Math.PI / 3, (Math.PI / 6) * children.length);
-        const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
+        // Find the Level 1 ancestor to get the sector
+        const parentData = parent.data as NodeData;
+        const level1AncestorId = parentData.parentIds?.[0];
+        const sector = level1AncestorId ? sectorMap.get(level1AncestorId) : null;
         
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const childAngle = parentAngle + (index - (children.length - 1) / 2) * angleStep;
-            node.position = {
-              x: parent.position.x + Math.cos(childAngle) * level3Radius,
-              y: parent.position.y + Math.sin(childAngle) * level3Radius
-            };
-          }
-        });
+        if (sector) {
+          const { startAngle, endAngle } = sector;
+          
+          // Position level 3 nodes at a fixed radius, distributed around their parent
+          const level3Radius = 500; // Fixed distance from center for all level 3 nodes
+          const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
+          
+          // Calculate spread within sector constraints
+          const maxSpread = Math.PI / 4; // Maximum 45 degrees spread
+          const actualSpread = Math.min(maxSpread, (endAngle - startAngle) * 0.3);
+          const angleStep = children.length > 1 ? actualSpread / (children.length - 1) : 0;
+          const startChildAngle = parentAngle - actualSpread / 2;
+          
+          children.forEach((node, index) => {
+            if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+              let angle = startChildAngle + index * angleStep;
+              
+              // Ensure angle stays within sector bounds
+              angle = Math.max(startAngle + 0.1, Math.min(endAngle - 0.1, angle));
+              
+              const x = centerX + Math.cos(angle) * level3Radius;
+              const y = centerY + Math.sin(angle) * level3Radius;
+              
+              node.position = { x, y };
+            }
+          });
+        }
       }
     });
     
@@ -435,26 +622,40 @@ function DocumentGraphInner() {
     level4NodesByParent.forEach((children, parentId) => {
       const parent = layoutNodes.find(n => n.id === parentId);
       if (parent) {
-        const grandParent = layoutNodes.find(n => 
-          n.id === (parent.data as NodeData).parentIds?.[0]
-        );
+        // Find the Level 1 ancestor through the parent hierarchy
+        const parentData = parent.data as NodeData;
+        const level2AncestorId = parentData.parentIds?.[0];
+        const level2Ancestor = level2AncestorId ? layoutNodes.find(n => n.id === level2AncestorId) : null;
+        const level1AncestorId = level2Ancestor ? (level2Ancestor.data as NodeData).parentIds?.[0] : null;
+        const sector = level1AncestorId ? sectorMap.get(level1AncestorId) : null;
         
-        let baseAngle = Math.PI / 2; // Default downward
-        if (grandParent) {
-          baseAngle = Math.atan2(parent.position.y - grandParent.position.y, parent.position.x - grandParent.position.x);
+        if (sector) {
+          const { startAngle, endAngle } = sector;
+          
+          // Position level 4 nodes at the outermost radius
+          const level4Radius = 650; // Fixed distance from center for all level 4 nodes
+          const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
+          
+          // Very narrow spread for level 4 nodes
+          const maxSpread = Math.PI / 6; // Maximum 30 degrees spread
+          const actualSpread = Math.min(maxSpread, (endAngle - startAngle) * 0.2);
+          const angleStep = children.length > 1 ? actualSpread / (children.length - 1) : 0;
+          const startChildAngle = parentAngle - actualSpread / 2;
+          
+          children.forEach((node, index) => {
+            if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
+              let angle = startChildAngle + index * angleStep;
+              
+              // Ensure angle stays within sector bounds
+              angle = Math.max(startAngle + 0.05, Math.min(endAngle - 0.05, angle));
+              
+              const x = centerX + Math.cos(angle) * level4Radius;
+              const y = centerY + Math.sin(angle) * level4Radius;
+              
+              node.position = { x, y };
+            }
+          });
         }
-        
-        const spacing = 120;
-        
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const offset = (index - (children.length - 1) / 2) * spacing;
-            node.position = {
-              x: parent.position.x + offset * Math.cos(baseAngle + Math.PI / 2),
-              y: parent.position.y + level4Spacing + offset * Math.sin(baseAngle + Math.PI / 2)
-            };
-          }
-        });
       }
     });
     
@@ -467,13 +668,17 @@ function DocumentGraphInner() {
   }, []);
   
   // Handle node drag to mark as manually positioned
-  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    setAllNodesData(prev => prev.map(n => 
-      n.id === node.id 
-        ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
-        : n
-    ));
-  }, []);
+  const handleNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+    if (layoutType === 'force' && forceEnabled) {
+      forceNodeDragStop(event, node);
+    } else {
+      setAllNodesData(prev => prev.map(n => 
+        n.id === node.id 
+          ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
+          : n
+      ));
+    }
+  }, [layoutType, forceEnabled, forceNodeDragStop]);
   
   // Handle node click to expand/collapse
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -507,10 +712,15 @@ function DocumentGraphInner() {
           
           // Apply layout to new children while preserving manual positions
           setTimeout(() => {
-            const updatedNodes = autoLayout(allNodesData, true);
-            setAllNodesData(updatedNodes);
+            if (layoutType === 'force' && forceEnabled) {
+              // Force layout will handle positioning
+              restartSimulation(true);
+            } else {
+              const updatedNodes = autoLayout(allNodesData, true);
+              setAllNodesData(updatedNodes);
+            }
             
-            const children = updatedNodes.filter(n => 
+            const children = allNodesData.filter(n => 
               (n.data as NodeData).parentIds?.includes(node.id)
             );
             const nodesToFit = [node, ...children];
@@ -612,13 +822,18 @@ function DocumentGraphInner() {
       }
     }));
     
-    // Apply auto-layout
-    const layoutedNodes = autoLayout(resetNodes);
-    setAllNodesData(layoutedNodes);
+    // Apply appropriate layout
+    if (layoutType === 'force' && forceEnabled) {
+      setAllNodesData(resetNodes);
+      setTimeout(() => restartSimulation(false), 100);
+    } else {
+      const layoutedNodes = autoLayout(resetNodes);
+      setAllNodesData(layoutedNodes);
+    }
     
     // Focus on the center with level 1 and 2 nodes
     setTimeout(() => {
-      const level12Nodes = layoutedNodes.filter(n => {
+      const level12Nodes = resetNodes.filter(n => {
         const nodeData = n.data as NodeData;
         return nodeData.level === 1 || nodeData.level === 2;
       });
@@ -629,7 +844,23 @@ function DocumentGraphInner() {
         padding: 0.5,
       });
     }, 100);
-  }, [allNodesData, reactFlowInstance]);
+  }, [allNodesData, reactFlowInstance, layoutType, forceEnabled, restartSimulation]);
+  
+  // Handle layout type change
+  const handleLayoutChange = useCallback((newLayoutType: 'sector' | 'force') => {
+    setLayoutType(newLayoutType);
+    
+    if (newLayoutType === 'force') {
+      setForceEnabled(true);
+      setTimeout(() => restartSimulation(true), 100);
+    } else {
+      setForceEnabled(false);
+      stopSimulation();
+      // Apply sector layout
+      const layoutedNodes = autoLayout(allNodesData, true);
+      setAllNodesData(layoutedNodes);
+    }
+  }, [allNodesData, restartSimulation, stopSimulation]);
   
   const onConnect = useCallback(
     (_params: Connection) => {
@@ -681,11 +912,16 @@ function DocumentGraphInner() {
     const allNodes = dataService.entitiesToNodes();
     console.log('Loaded nodes from data service:', allNodes.length);
     
-    const layoutedNodes = autoLayout(allNodes);
-    setAllNodesData(layoutedNodes);
+    if (layoutType === 'force' && forceEnabled) {
+      setAllNodesData(allNodes);
+      // Force layout will be triggered after nodes are set
+    } else {
+      const layoutedNodes = autoLayout(allNodes);
+      setAllNodesData(layoutedNodes);
+    }
     
     // Only show level 1 and 2 nodes initially
-    const initialVisibleNodes = layoutedNodes.filter(n => {
+    const initialVisibleNodes = allNodes.filter(n => {
       const nodeData = n.data as NodeData;
       return nodeData.level === 1 || nodeData.level === 2;
     });
@@ -706,6 +942,32 @@ function DocumentGraphInner() {
       }
     };
   }, []);
+  
+  // Trigger force simulation when enabled
+  React.useEffect(() => {
+    if (layoutType === 'force' && forceEnabled && nodes.length > 0 && !isSimulating) {
+      runSimulation(true);
+    }
+  }, [layoutType, forceEnabled, nodes.length, runSimulation, isSimulating]);
+
+  // Fit view to show all level 1 nodes when they change
+  React.useEffect(() => {
+    if (reactFlowInstance && nodes.length > 0) {
+      // Wait a bit for nodes to be positioned
+      setTimeout(() => {
+        const level1Nodes = nodes.filter(n => (n.data as NodeData).level === 1);
+        if (level1Nodes.length > 0) {
+          reactFlowInstance.fitView({
+            nodes: level1Nodes,
+            duration: 800,
+            padding: 0.5,
+            minZoom: 0.5,
+            maxZoom: 1
+          });
+        }
+      }, 100);
+    }
+  }, [nodes.length, reactFlowInstance]);
   
   // Update node expansion state and visibility
 useEffect(() => {
@@ -781,10 +1043,13 @@ useEffect(() => {
     }
   }));
   
-  const visibleNodeIds = new Set(nodesToDisplay.map(n => n.id));
-  const filteredEdges = edges.filter(edge => 
-    visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
-  );
+  // Use the same filtered edges that were passed to force layout
+  const displayNodeIds = new Set(nodesToDisplay.map(n => n.id));
+  const filteredEdges = edges.filter(edge => {
+    const sourceId = typeof edge.source === 'string' ? edge.source : edge.source;
+    const targetId = typeof edge.target === 'string' ? edge.target : edge.target;
+    return displayNodeIds.has(sourceId) && displayNodeIds.has(targetId);
+  });
   
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
@@ -796,9 +1061,9 @@ useEffect(() => {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onNodeDrag={layoutType === 'force' && forceEnabled ? forceNodeDrag : undefined}
           onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
-          fitView
           className="bg-transparent"
         >
           <Background 
@@ -826,17 +1091,18 @@ useEffect(() => {
             className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg"
           />
           
-          <Panel position="top-left" className="flex gap-2">
-            <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center gap-2">
-              <Search className="w-5 h-5 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Search nodes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent outline-none w-48 text-sm"
-              />
-            </div>
+          <Panel position="top-left" className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center gap-2">
+                <Search className="w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search nodes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent outline-none w-48 text-sm"
+                />
+              </div>
             
             <button
               onClick={() => setShowAddModal(true)}
@@ -876,6 +1142,126 @@ useEffect(() => {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
+            </div>
+            
+            {/* Layout Controls */}
+            <div className="flex gap-2">
+              <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center gap-2">
+                <button
+                  onClick={() => handleLayoutChange('sector')}
+                  className={`px-3 py-1 rounded-md flex items-center gap-1 transition-colors ${
+                    layoutType === 'sector' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                  title="Sector Layout"
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                  <span className="text-sm">Sector</span>
+                </button>
+                <button
+                  onClick={() => handleLayoutChange('force')}
+                  className={`px-3 py-1 rounded-md flex items-center gap-1 transition-colors ${
+                    layoutType === 'force' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                  title="Force-Directed Layout"
+                >
+                  <Zap className="w-4 h-4" />
+                  <span className="text-sm">Force</span>
+                </button>
+              </div>
+              
+              {layoutType === 'force' && (
+                <>
+                  <button
+                    onClick={() => setForceEnabled(!forceEnabled)}
+                    className={`bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+                      forceEnabled ? 'text-green-600' : 'text-gray-500'
+                    }`}
+                    title={forceEnabled ? 'Pause Simulation' : 'Run Simulation'}
+                  >
+                    {forceEnabled && isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                    <span className="text-sm">{isSimulating ? 'Running' : forceEnabled ? 'Ready' : 'Paused'}</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setShowForceSettings(!showForceSettings)}
+                    className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-2 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
+                    title="Force Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+            
+            {/* Force Settings Panel */}
+            {showForceSettings && layoutType === 'force' && (
+              <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-4 space-y-3">
+                <h3 className="font-semibold text-sm mb-2">Force Settings</h3>
+                
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-400">Link Strength</label>
+                  <input
+                    type="range"
+                    min="-2000"
+                    max="0"
+                    value={forceOptions.strength}
+                    onChange={(e) => setForceOptions({ ...forceOptions, strength: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <span className="text-xs">{forceOptions.strength}</span>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-400">Link Distance</label>
+                  <input
+                    type="range"
+                    min="50"
+                    max="300"
+                    value={forceOptions.distance}
+                    onChange={(e) => setForceOptions({ ...forceOptions, distance: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <span className="text-xs">{forceOptions.distance}</span>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-400">Node Repulsion</label>
+                  <input
+                    type="range"
+                    min="-3000"
+                    max="-100"
+                    value={forceOptions.nodeRepulsion}
+                    onChange={(e) => setForceOptions({ ...forceOptions, nodeRepulsion: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <span className="text-xs">{forceOptions.nodeRepulsion}</span>
+                </div>
+                
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-400">Collision Padding</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    value={forceOptions.collisionPadding}
+                    onChange={(e) => setForceOptions({ ...forceOptions, collisionPadding: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <span className="text-xs">{forceOptions.collisionPadding}px</span>
+                </div>
+                
+                <button
+                  onClick={() => restartSimulation(true)}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-md py-1 text-sm transition-colors"
+                >
+                  Apply Changes
+                </button>
+              </div>
+            )}
           </Panel>
         </ReactFlow>
         
@@ -979,9 +1365,25 @@ useEffect(() => {
           >
             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-l border-t border-gray-200 dark:border-gray-700"></div>
             <h4 className="font-semibold mb-2">{tooltipState.data.label}</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{tooltipState.data.description}</p>
+            {tooltipState.data.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{tooltipState.data.description}</p>
+            )}
+            {/* Show metadata information */}
+            {(() => {
+              const metadataDisplay = dataService.getMetadataDisplay(tooltipState.data);
+              return metadataDisplay.length > 0 && (
+                <div className="text-sm text-gray-600 dark:text-gray-300 mb-2 space-y-1">
+                  {metadataDisplay.map((item, index) => (
+                    <p key={index}>{item}</p>
+                  ))}
+                </div>
+              );
+            })()}
             {tooltipState.data.expiry && (
               <p className="text-sm text-red-600 dark:text-red-400">Expires: {tooltipState.data.expiry}</p>
+            )}
+            {tooltipState.data.ownership === 'shared' && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Shared Asset</p>
             )}
             {tooltipState.data.source && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {tooltipState.data.source}</p>
