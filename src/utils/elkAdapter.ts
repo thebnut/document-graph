@@ -1,5 +1,5 @@
 import { Node, Edge } from 'reactflow';
-import ELK, { ElkNode, ElkEdge } from 'elkjs/lib/elk.bundled.js';
+import ELK, { ElkNode, ElkExtendedEdge } from 'elkjs/lib/elk.bundled.js';
 import { NodeData } from '../services/dataService';
 
 // Initialize ELK instance
@@ -113,7 +113,7 @@ const toElkNode = (node: Node<NodeData>): ElkNode => {
 /**
  * Convert ReactFlow edge to ELK edge format
  */
-const toElkEdge = (edge: Edge): ElkEdge => ({
+const toElkEdge = (edge: Edge): ElkExtendedEdge => ({
   id: edge.id,
   sources: [edge.source],
   targets: [edge.target],
