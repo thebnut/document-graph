@@ -115,8 +115,8 @@ const toElkNode = (node: Node<NodeData>): ElkNode => {
  */
 const toElkEdge = (edge: Edge): ElkEdge => ({
   id: edge.id,
-  source: edge.source,
-  target: edge.target,
+  sources: [edge.source],
+  targets: [edge.target],
 });
 
 /**
