@@ -1,6 +1,7 @@
 import { Node, Edge } from 'reactflow';
 import { DocumentGraphModel, Entity, EntityRelationship, EntityWithComputed } from '../data/model';
 import sampleData from '../data/sampleData.json';
+import expandedSampleData from '../data/expandedSampleData.json';
 
 export interface NodeData extends EntityWithComputed {
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
@@ -9,9 +10,15 @@ export interface NodeData extends EntityWithComputed {
 
 export class DataService {
   private model: DocumentGraphModel;
+  private useExpandedData: boolean;
 
-  constructor(model?: DocumentGraphModel) {
-    this.model = model || (sampleData as DocumentGraphModel);
+  constructor(model?: DocumentGraphModel, useExpandedData: boolean = true) {
+    if (model) {
+      this.model = model;
+    } else {
+      this.model = useExpandedData ? (expandedSampleData as DocumentGraphModel) : (sampleData as DocumentGraphModel);
+    }
+    this.useExpandedData = useExpandedData;
   }
 
   /**
@@ -173,6 +180,42 @@ export class DataService {
 
       return false;
     });
+  }
+
+  /**
+   * Get formatted metadata display strings for an entity
+   */
+  getMetadataDisplay(entity: Entity): string[] {
+    const displays: string[] = [];
+    
+    if (!entity.metadata) return displays;
+    
+    // Handle different metadata types
+    if (entity.category === 'passport' && 'passportNumber' in entity.metadata) {
+      displays.push(`Passport: ${entity.metadata.passportNumber}`);
+      if (entity.metadata.expiryDate) {
+        displays.push(`Expires: ${entity.metadata.expiryDate}`);
+      }
+    } else if (entity.category === 'drivers-licence' && 'licenceNumber' in entity.metadata) {
+      displays.push(`Licence: ${entity.metadata.licenceNumber}`);
+      if (entity.metadata.expiryDate) {
+        displays.push(`Expires: ${entity.metadata.expiryDate}`);
+      }
+    } else if (entity.category === 'bank-accounts' && 'bank' in entity.metadata) {
+      displays.push(`Bank: ${entity.metadata.bank}`);
+      if (entity.metadata.accountType) {
+        displays.push(`Type: ${entity.metadata.accountType}`);
+      }
+    } else if ((entity.category === 'car-insurance' || entity.category === 'insurance') && 'policyNumber' in entity.metadata) {
+      displays.push(`Policy: ${entity.metadata.policyNumber}`);
+      if (entity.metadata.provider) {
+        displays.push(`Provider: ${entity.metadata.provider}`);
+      }
+    } else if (entity.subtype === 'vehicle' && 'make' in entity.metadata) {
+      displays.push(`${entity.metadata.year || ''} ${entity.metadata.make} ${entity.metadata.model}`.trim());
+    }
+    
+    return displays;
   }
 }
 

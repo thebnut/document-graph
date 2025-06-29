@@ -43,7 +43,14 @@ import {
   Phone,
   MapPin,
   DollarSign,
-  RotateCcw
+  RotateCcw,
+  Folder,
+  Baby,
+  HeartPulse,
+  Banknote,
+  IdCard,
+  Hospital,
+  Stethoscope
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
@@ -219,6 +226,18 @@ const EntityNode = ({
         return 'bg-gradient-to-br from-green-400 to-green-600 hover:from-green-500 hover:to-green-700';
       case 'document':
         return 'bg-gradient-to-br from-purple-400 to-purple-600 hover:from-purple-500 hover:to-purple-700';
+      case 'folder':
+        // Different colors for different folder types
+        switch (data.subtype) {
+          case 'identity':
+            return 'bg-gradient-to-br from-amber-400 to-amber-600 hover:from-amber-500 hover:to-amber-700';
+          case 'health':
+            return 'bg-gradient-to-br from-red-400 to-red-600 hover:from-red-500 hover:to-red-700';
+          case 'financial':
+            return 'bg-gradient-to-br from-emerald-400 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700';
+          default:
+            return 'bg-gradient-to-br from-indigo-400 to-indigo-600 hover:from-indigo-500 hover:to-indigo-700';
+        }
       default:
         return 'bg-gradient-to-br from-gray-400 to-gray-600';
     }
@@ -232,29 +251,64 @@ const EntityNode = ({
     
     const iconClass = data.type === 'person' || data.level === 2 ? 'w-8 h-8' : 'w-6 h-6';
     
+    // Handle folders first
+    if (data.type === 'folder') {
+      switch (data.subtype) {
+        case 'identity':
+          return <IdCard className={iconClass} />;
+        case 'health':
+          return <HeartPulse className={iconClass} />;
+        case 'financial':
+          return <Banknote className={iconClass} />;
+        default:
+          return <Folder className={iconClass} />;
+      }
+    }
+    
+    // Handle specific document categories
+    if (data.category) {
+      switch (data.category) {
+        case 'passport':
+          return <Plane className={iconClass} />;
+        case 'birth-certificate':
+          return <Baby className={iconClass} />;
+        case 'drivers-licence':
+          return <Car className={iconClass} />;
+        case 'hospital-visits':
+          return <Hospital className={iconClass} />;
+        case 'imaging-reports':
+          return <Stethoscope className={iconClass} />;
+        case 'bank-accounts':
+          return <DollarSign className={iconClass} />;
+        case 'car-insurance':
+        case 'insurance':
+          return <Shield className={iconClass} />;
+        case 'gp':
+          return <Heart className={iconClass} />;
+      }
+    }
+    
     // More specific icons based on label content
     const labelLower = data.label.toLowerCase();
     
     // Check for specific document types
     if (labelLower.includes('cleaner')) return <Sparkles className={iconClass} />;
     if (labelLower.includes('gardener')) return <Trees className={iconClass} />;
-    if (labelLower.includes('passport')) return <Plane className={iconClass} />;
-    if (labelLower.includes('insurance')) return <Shield className={iconClass} />;
-    if (labelLower.includes('health')) return <Heart className={iconClass} />;
     if (labelLower.includes('medicare')) return <CreditCard className={iconClass} />;
-    if (labelLower.includes('visa')) return <Plane className={iconClass} />;
-    if (labelLower.includes('birth certificate')) return <FileText className={iconClass} />;
     if (labelLower.includes('document')) return <FolderOpen className={iconClass} />;
     if (labelLower.includes('email')) return <Mail className={iconClass} />;
     if (labelLower.includes('phone')) return <Phone className={iconClass} />;
     if (labelLower.includes('address')) return <MapPin className={iconClass} />;
-    if (labelLower.includes('financial') || labelLower.includes('bank')) return <DollarSign className={iconClass} />;
     if (labelLower.includes('work') || labelLower.includes('employment')) return <Briefcase className={iconClass} />;
     if (labelLower.includes('calendar') || labelLower.includes('schedule')) return <Calendar className={iconClass} />;
     
     // Default icons by type
     switch (data.type) {
       case 'person':
+        // Children vs adults
+        return data.level === 2 && ['Freya', 'Anya'].some(name => data.label.includes(name)) 
+          ? <Baby className={iconClass} /> 
+          : <User className={iconClass} />;
       case 'pet':
         return <User className={iconClass} />;
       case 'asset':
@@ -830,9 +884,25 @@ function DocumentGraphInner() {
           >
             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-800 rotate-45 border-l border-t border-gray-200 dark:border-gray-700"></div>
             <h4 className="font-semibold mb-2">{tooltipState.data.label}</h4>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{tooltipState.data.description}</p>
+            {tooltipState.data.description && (
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{tooltipState.data.description}</p>
+            )}
+            {/* Show metadata information */}
+            {(() => {
+              const metadataDisplay = dataService.getMetadataDisplay(tooltipState.data);
+              return metadataDisplay.length > 0 && (
+                <div className="text-sm text-gray-600 dark:text-gray-300 mb-2 space-y-1">
+                  {metadataDisplay.map((item, index) => (
+                    <p key={index}>{item}</p>
+                  ))}
+                </div>
+              );
+            })()}
             {tooltipState.data.expiry && (
               <p className="text-sm text-red-600 dark:text-red-400">Expires: {tooltipState.data.expiry}</p>
+            )}
+            {tooltipState.data.ownership === 'shared' && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Shared Asset</p>
             )}
             {tooltipState.data.source && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {tooltipState.data.source}</p>
