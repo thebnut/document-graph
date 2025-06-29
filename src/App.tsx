@@ -12,6 +12,7 @@ import ReactFlow, {
   Handle,
   Position,
   Node,
+  Edge,
   NodeTypes,
   BackgroundVariant,
   useReactFlow,
@@ -47,6 +48,8 @@ import {
 import { dataService, NodeData } from './services/dataService';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
 import { DocumentViewer } from './components/DocumentViewer';
+import { useElkLayout } from './hooks/useElkLayout';
+import { VIRTUAL_ROOT_ID } from './utils/elkAdapter';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -180,9 +183,14 @@ const EntityNode = ({
   onHideTooltip: () => void;
 }) => {
   
-  // Different sizes for different node types
+  // Different sizes for different node types (adjusted for virtual root)
   const getNodeSize = () => {
-    if (data.level === 1) return 'w-32 h-32'; // Largest for central nodes
+    // Virtual root is minimal
+    if (data.isVirtual) return 'w-8 h-8';
+    
+    // Adjusted levels (original level + 1)
+    if (data.level === 2) return 'w-32 h-32'; // People/Pets (was level 1)
+    
     switch (data.type) {
       case 'person':
         return 'w-28 h-28';
@@ -198,6 +206,11 @@ const EntityNode = ({
   };
   
   const getNodeColor = () => {
+    // Virtual root has special styling
+    if (data.isVirtual) {
+      return 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500';
+    }
+    
     switch (data.type) {
       case 'person':
       case 'pet':
@@ -212,7 +225,12 @@ const EntityNode = ({
   };
   
   const getIcon = () => {
-    const iconClass = data.type === 'person' || data.level === 1 ? 'w-8 h-8' : 'w-6 h-6';
+    // Virtual root gets a home icon
+    if (data.isVirtual) {
+      return <Home className="w-4 h-4" />;
+    }
+    
+    const iconClass = data.type === 'person' || data.level === 2 ? 'w-8 h-8' : 'w-6 h-6';
     
     // More specific icons based on label content
     const labelLower = data.label.toLowerCase();
@@ -326,15 +344,35 @@ function DocumentGraphInner() {
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reactFlowInstance = useReactFlow();
   const { openDocument } = useDocumentViewer();
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+  const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
   
-  // Store all nodes data
-  const [allNodesData, setAllNodesData] = useState<Node[]>([]);
+  // Initialize with data from data service
+  const initialNodes = React.useMemo(() => {
+    const allNodes = dataService.entitiesToNodes();
+    console.log('Loaded nodes from data service:', allNodes.length);
+    return allNodes;
+  }, []);
+  
+  // Use ELK layout hook
+  const {
+    nodes: elkNodes,
+    displayNodes,
+    expandedNodes,
+    isLayouting,
+    toggleNodeExpansion,
+    handleNodeDragStop,
+    resetLayout,
+    applyLayout,
+  } = useElkLayout({
+    initialNodes,
+    edges: initialEdges,
+    onNodesChange: setNodes,
+  });
   
   // Global tooltip state
   const [tooltipState, setTooltipState] = useState<TooltipState>({
@@ -351,132 +389,12 @@ function DocumentGraphInner() {
     description: '',
   });
   
-  // Auto-layout function with better spacing
-  const autoLayout = (nodes: Node[], preserveManualPositions = false) => {
-    const centerX = 400;
-    const centerY = 300;
-    const level2Radius = 250;
-    const level3Radius = 200;
-    const level4Spacing = 150;
-    
-    const layoutNodes = [...nodes];
-    
-    // Position level 1 (central) nodes
-    const level1Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 1);
-    level1Nodes.forEach((node, index) => {
-      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        node.position = {
-          x: centerX + (index === 0 ? -100 : 100),
-          y: centerY
-        };
-      }
-    });
-    
-    // Position level 2 nodes in a circle around center
-    const level2Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 2);
-    const angleStep2 = (2 * Math.PI) / Math.max(level2Nodes.length, 1);
-    level2Nodes.forEach((node, index) => {
-      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        const angle = index * angleStep2 - Math.PI / 2;
-        node.position = {
-          x: centerX + Math.cos(angle) * level2Radius,
-          y: centerY + Math.sin(angle) * level2Radius
-        };
-      }
-    });
-    
-    // Position level 3 nodes with proper spacing
-    const level3NodesByParent = new Map<string, Node[]>();
-    const level3Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 3);
-    
-    level3Nodes.forEach(node => {
-      const parentId = (node.data as NodeData).parentIds?.[0];
-      if (parentId) {
-        if (!level3NodesByParent.has(parentId)) {
-          level3NodesByParent.set(parentId, []);
-        }
-        level3NodesByParent.get(parentId)!.push(node);
-      }
-    });
-    
-    level3NodesByParent.forEach((children, parentId) => {
-      const parent = layoutNodes.find(n => n.id === parentId);
-      if (parent) {
-        const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
-        const spreadAngle = Math.min(Math.PI / 3, (Math.PI / 6) * children.length);
-        const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
-        
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const childAngle = parentAngle + (index - (children.length - 1) / 2) * angleStep;
-            node.position = {
-              x: parent.position.x + Math.cos(childAngle) * level3Radius,
-              y: parent.position.y + Math.sin(childAngle) * level3Radius
-            };
-          }
-        });
-      }
-    });
-    
-    // Position level 4 nodes with proper spacing
-    const level4NodesByParent = new Map<string, Node[]>();
-    const level4Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 4);
-    
-    level4Nodes.forEach(node => {
-      const parentId = (node.data as NodeData).parentIds?.[0];
-      if (parentId) {
-        if (!level4NodesByParent.has(parentId)) {
-          level4NodesByParent.set(parentId, []);
-        }
-        level4NodesByParent.get(parentId)!.push(node);
-      }
-    });
-    
-    level4NodesByParent.forEach((children, parentId) => {
-      const parent = layoutNodes.find(n => n.id === parentId);
-      if (parent) {
-        const grandParent = layoutNodes.find(n => 
-          n.id === (parent.data as NodeData).parentIds?.[0]
-        );
-        
-        let baseAngle = Math.PI / 2; // Default downward
-        if (grandParent) {
-          baseAngle = Math.atan2(parent.position.y - grandParent.position.y, parent.position.x - grandParent.position.x);
-        }
-        
-        const spacing = 120;
-        
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const offset = (index - (children.length - 1) / 2) * spacing;
-            node.position = {
-              x: parent.position.x + offset * Math.cos(baseAngle + Math.PI / 2),
-              y: parent.position.y + level4Spacing + offset * Math.sin(baseAngle + Math.PI / 2)
-            };
-          }
-        });
-      }
-    });
-    
-    return layoutNodes;
-  };
-  
-  // Get all descendant IDs recursively
-  const getAllDescendantIds = useCallback((nodeId: string): string[] => {
-    return dataService.getAllDescendantIds(nodeId);
-  }, []);
-  
-  // Handle node drag to mark as manually positioned
-  const handleNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    setAllNodesData(prev => prev.map(n => 
-      n.id === node.id 
-        ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
-        : n
-    ));
-  }, []);
   
   // Handle node click to expand/collapse
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Don't handle clicks on virtual root
+    if (node.id === VIRTUAL_ROOT_ID) return;
+    
     // Hide tooltip immediately on click
     if (tooltipTimeoutRef.current) {
       clearTimeout(tooltipTimeoutRef.current);
@@ -485,46 +403,32 @@ function DocumentGraphInner() {
     
     const nodeData = node.data as NodeData;
     if (nodeData.hasChildren) {
-      setExpandedNodes(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(node.id)) {
-          // Collapsing: remove this node and all descendants
-          newSet.delete(node.id);
-          const descendants = getAllDescendantIds(node.id);
-          descendants.forEach(id => newSet.delete(id));
-          
-          // Focus on the collapsed node
-          setTimeout(() => {
-            reactFlowInstance.fitView({
-              nodes: [{ id: node.id }],
-              duration: 800,
-              padding: 2,
-            });
-          }, 100);
+      toggleNodeExpansion(node.id);
+      
+      // Focus on the relevant nodes after layout
+      setTimeout(() => {
+        if (expandedNodes.has(node.id)) {
+          // If expanded, focus on node and its children
+          const children = elkNodes.filter(n => 
+            (n.data as NodeData).parentIds?.includes(node.id)
+          );
+          const nodesToFit = [node, ...children];
+          reactFlowInstance.fitView({
+            nodes: nodesToFit,
+            duration: 800,
+            padding: 0.5,
+          });
         } else {
-          // Expanding: add this node
-          newSet.add(node.id);
-          
-          // Apply layout to new children while preserving manual positions
-          setTimeout(() => {
-            const updatedNodes = autoLayout(allNodesData, true);
-            setAllNodesData(updatedNodes);
-            
-            const children = updatedNodes.filter(n => 
-              (n.data as NodeData).parentIds?.includes(node.id)
-            );
-            const nodesToFit = [node, ...children];
-            reactFlowInstance.fitView({
-              nodes: nodesToFit,
-              duration: 800,
-              padding: 0.5,
-            });
-          }, 100);
+          // If collapsed, focus on the node
+          reactFlowInstance.fitView({
+            nodes: [{ id: node.id }],
+            duration: 800,
+            padding: 2,
+          });
         }
-        return newSet;
-      });
+      }, 300); // Wait for layout to complete
     }
-  }, [allNodesData, reactFlowInstance, getAllDescendantIds]);
+  }, [expandedNodes, toggleNodeExpansion, elkNodes, reactFlowInstance]);
   
   // Track mouse position for distance-based hiding
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -598,38 +502,10 @@ function DocumentGraphInner() {
     return () => document.removeEventListener('mousemove', handleGlobalMouseMove);
   }, [tooltipState.show, isTooltipHovered]);
 
-  // Handle reset canvas
+  // Handle reset canvas is now delegated to ELK layout hook
   const handleResetCanvas = useCallback(() => {
-    // Clear all expanded nodes
-    setExpandedNodes(new Set());
-    
-    // Reset manual positioning for all nodes
-    const resetNodes = allNodesData.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        isManuallyPositioned: false
-      }
-    }));
-    
-    // Apply auto-layout
-    const layoutedNodes = autoLayout(resetNodes);
-    setAllNodesData(layoutedNodes);
-    
-    // Focus on the center with level 1 and 2 nodes
-    setTimeout(() => {
-      const level12Nodes = layoutedNodes.filter(n => {
-        const nodeData = n.data as NodeData;
-        return nodeData.level === 1 || nodeData.level === 2;
-      });
-      
-      reactFlowInstance.fitView({
-        nodes: level12Nodes,
-        duration: 800,
-        padding: 0.5,
-      });
-    }, 100);
-  }, [allNodesData, reactFlowInstance]);
+    resetLayout();
+  }, [resetLayout]);
   
   const onConnect = useCallback(
     (_params: Connection) => {
@@ -643,15 +519,9 @@ function DocumentGraphInner() {
   const addNode = () => {
     if (!newNodeData.label) return;
     
-    const newNode: Node = {
-      id: `${Date.now()}`,
-      type: 'entity',
-      position: { x: Math.random() * 500, y: Math.random() * 500 },
-      data: newNodeData as NodeData,
-    };
-    
-    setNodes((nds) => [...nds, newNode]);
-    setAllNodesData((nds) => [...nds, newNode]);
+    // TODO: Implement add node with ELK layout
+    // This would need to update the data service and re-layout
+    console.log('Add node not yet implemented with ELK layout');
     setNewNodeData({ type: 'person', label: '', description: '' });
     setShowAddModal(false);
   };
@@ -659,44 +529,18 @@ function DocumentGraphInner() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const documentNode: Node = {
-        id: `doc-${Date.now()}`,
-        type: 'entity',
-        position: { x: Math.random() * 500, y: Math.random() * 500 },
-        data: {
-          label: file.name,
-          type: 'document',
-          description: `Uploaded document: ${file.name}`,
-          source: 'Manual upload',
-        },
-      };
-      setNodes((nds) => [...nds, documentNode]);
-      setAllNodesData((nds) => [...nds, documentNode]);
+      // TODO: Implement file upload with ELK layout
+      console.log('File upload not yet implemented with ELK layout');
     }
   };
   
-  // Initialize with data from data service
+  // Initialize edges from data service
   React.useEffect(() => {
-    // Convert entities to nodes
-    const allNodes = dataService.entitiesToNodes();
-    console.log('Loaded nodes from data service:', allNodes.length);
-    
-    const layoutedNodes = autoLayout(allNodes);
-    setAllNodesData(layoutedNodes);
-    
-    // Only show level 1 and 2 nodes initially
-    const initialVisibleNodes = layoutedNodes.filter(n => {
-      const nodeData = n.data as NodeData;
-      return nodeData.level === 1 || nodeData.level === 2;
-    });
-    
-    setNodes(initialVisibleNodes);
-    
-    // Create edges from relationships
     const edges = dataService.relationshipsToEdges();
     console.log('Loaded edges from data service:', edges.length);
     setEdges(edges);
-  }, [setNodes, setEdges]);
+    setInitialEdges(edges);
+  }, [setEdges]);
   
   // Cleanup timeout on unmount
   React.useEffect(() => {
@@ -707,58 +551,9 @@ function DocumentGraphInner() {
     };
   }, []);
   
-  // Update node expansion state and visibility
-useEffect(() => {
-  // Track current node positions before update
-  const currentPositions = new Map(nodes.map(n => [n.id, n.position]));
-
-  // Update expansion state
-  const updatedAllNodes = allNodesData.map(node => ({
-    ...node,
-    data: {
-      ...node.data,
-      isExpanded: expandedNodes.has(node.id)
-    },
-    // Preserve current position if node is already visible and manually positioned
-    position: (node.data as NodeData).isManuallyPositioned && currentPositions.has(node.id)
-      ? currentPositions.get(node.id)!
-      : node.position
-  }));
-
-  // Filter visible nodes
-  const visibleNodes = updatedAllNodes.filter(node => {
-    const nodeData = node.data as NodeData;
-
-    // Always show level 1 and 2
-    if (nodeData.level === 1 || nodeData.level === 2) return true;
-
-    // For other nodes, check if ALL parent nodes in the chain are expanded
-    if (nodeData.parentIds) {
-      // Check immediate parent first
-      const immediateParentExpanded = nodeData.parentIds.some(parentId => expandedNodes.has(parentId));
-      if (!immediateParentExpanded) return false;
-
-      // For level 4 nodes, also check if grandparent is expanded
-      if (nodeData.level === 4) {
-        const parent = allNodesData.find(n => n.id === nodeData.parentIds![0]);
-        if (parent) {
-          const grandParentIds = (parent.data as NodeData).parentIds || [];
-          const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
-          if (!grandParentExpanded) return false;
-        }
-      }
-
-      return true;
-    }
-
-    return false;
-  });
-
-  setNodes(visibleNodes);
-}, [expandedNodes, allNodesData, setNodes]); // <-- 'nodes' removed
   
   // Apply search filter and add tooltip handlers to nodes
-  const filteredNodes = nodes.filter(node => {
+  const filteredNodes = displayNodes.filter(node => {
     if (!searchQuery) return true;
     const nodeData = node.data as NodeData;
     return nodeData.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -772,7 +567,7 @@ useEffect(() => {
     }
   }));
   
-  const nodesToDisplay = searchQuery ? filteredNodes : nodes.map(node => ({
+  const nodesToDisplay = searchQuery ? filteredNodes : displayNodes.map(node => ({
     ...node,
     data: {
       ...node.data,

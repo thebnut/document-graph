@@ -1,6 +1,6 @@
 // Data model interfaces for the Document Graph application
 
-export type EntityType = 'person' | 'pet' | 'asset' | 'document';
+export type EntityType = 'person' | 'pet' | 'asset' | 'document' | 'root';
 export type EntitySubtype = 'property' | 'vehicle' | 'financial' | 'legal' | 'medical' | 'insurance';
 
 export interface Entity {
@@ -52,4 +52,6 @@ export interface DocumentGraphModel {
 export interface EntityWithComputed extends Entity {
   isExpanded?: boolean;
   isManuallyPositioned?: boolean;
+  isVirtual?: boolean;
+  hideInView?: boolean;
 }
