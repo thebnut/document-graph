@@ -264,6 +264,26 @@ const EntityNode = ({
     }
   };
   
+  // Hide virtual root node visually
+  if (data.isVirtual) {
+    return (
+      <div className="relative">
+        <div className="w-1 h-1 opacity-0">
+          <Handle 
+            type="source" 
+            position={Position.Bottom}
+            style={{ 
+              background: 'transparent',
+              border: 'none',
+              width: '10px',
+              height: '10px',
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="relative">
       <div
@@ -295,31 +315,25 @@ const EntityNode = ({
           </div>
         )}
         
-        {/* Small centered handle for connections - allows dynamic connection points */}
+        {/* Handles for edge connections */}
         <Handle 
           type="source" 
-          position={Position.Top}
-          className="opacity-0" 
+          position={Position.Bottom}
           style={{ 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%'
+            background: 'transparent',
+            border: 'none',
+            width: '10px',
+            height: '10px',
           }}
         />
         <Handle 
           type="target" 
-          position={Position.Bottom}
-          className="opacity-0" 
+          position={Position.Top}
           style={{ 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%'
+            background: 'transparent',
+            border: 'none',
+            width: '10px',
+            height: '10px',
           }}
         />
       </div>
@@ -341,6 +355,8 @@ const nodeTypes: NodeTypes = {
 function DocumentGraphInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  console.log('[App] ReactFlow nodes state at render:', nodes.length, nodes);
   const [darkMode, setDarkMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -349,19 +365,22 @@ function DocumentGraphInner() {
   const { openDocument } = useDocumentViewer();
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
-  const [initialEdges, setInitialEdges] = useState<Edge[]>([]);
-  
-  // Initialize with data from data service
+  // Initialize nodes and edges from data service
   const initialNodes = React.useMemo(() => {
     const allNodes = dataService.entitiesToNodes();
-    console.log('Loaded nodes from data service:', allNodes.length);
+    console.log('[App] Initial nodes loaded:', allNodes.length, allNodes);
     return allNodes;
+  }, []);
+  
+  const initialEdges = React.useMemo(() => {
+    const allEdges = dataService.relationshipsToEdges();
+    console.log('[App] Initial edges loaded:', allEdges.length, allEdges);
+    return allEdges;
   }, []);
   
   // Use ELK layout hook
   const {
     nodes: elkNodes,
-    displayNodes,
     expandedNodes,
     isLayouting,
     toggleNodeExpansion,
@@ -392,6 +411,8 @@ function DocumentGraphInner() {
   
   // Handle node click to expand/collapse
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    console.log('[App] Node clicked:', node.id, 'hasChildren:', node.data.hasChildren);
+    
     // Don't handle clicks on virtual root
     if (node.id === VIRTUAL_ROOT_ID) return;
     
@@ -403,16 +424,27 @@ function DocumentGraphInner() {
     
     const nodeData = node.data as NodeData;
     if (nodeData.hasChildren) {
+      // Check what children this node has
+      const children = nodes.filter(n => 
+        (n.data as NodeData).parentIds?.includes(node.id)
+      );
+      console.log('[App] Node children found:', children.length, children.map(c => c.id));
+      
       toggleNodeExpansion(node.id);
       
       // Focus on the relevant nodes after layout
+      // Note: We need to check what the state WILL BE after toggle, not current state
+      const willBeExpanded = !expandedNodes.has(node.id);
+      console.log('[App] Node will be expanded after toggle?', willBeExpanded);
+      
       setTimeout(() => {
-        if (expandedNodes.has(node.id)) {
+        if (willBeExpanded) {
           // If expanded, focus on node and its children
-          const children = elkNodes.filter(n => 
+          const updatedChildren = nodes.filter(n => 
             (n.data as NodeData).parentIds?.includes(node.id)
           );
-          const nodesToFit = [node, ...children];
+          const nodesToFit = [node, ...updatedChildren];
+          console.log('[App] Fitting view to expanded nodes:', nodesToFit.map(n => n.id));
           reactFlowInstance.fitView({
             nodes: nodesToFit,
             duration: 800,
@@ -420,6 +452,7 @@ function DocumentGraphInner() {
           });
         } else {
           // If collapsed, focus on the node
+          console.log('[App] Fitting view to collapsed node:', node.id);
           reactFlowInstance.fitView({
             nodes: [{ id: node.id }],
             duration: 800,
@@ -428,7 +461,7 @@ function DocumentGraphInner() {
         }
       }, 300); // Wait for layout to complete
     }
-  }, [expandedNodes, toggleNodeExpansion, elkNodes, reactFlowInstance]);
+  }, [expandedNodes, toggleNodeExpansion, nodes, reactFlowInstance]);
   
   // Track mouse position for distance-based hiding
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -534,13 +567,10 @@ function DocumentGraphInner() {
     }
   };
   
-  // Initialize edges from data service
+  // Set edges from initial data
   React.useEffect(() => {
-    const edges = dataService.relationshipsToEdges();
-    console.log('Loaded edges from data service:', edges.length);
-    setEdges(edges);
-    setInitialEdges(edges);
-  }, [setEdges]);
+    setEdges(initialEdges);
+  }, [initialEdges, setEdges]);
   
   // Cleanup timeout on unmount
   React.useEffect(() => {
@@ -551,41 +581,64 @@ function DocumentGraphInner() {
     };
   }, []);
   
-  
-  // Apply search filter and add tooltip handlers to nodes
-  const filteredNodes = displayNodes.filter(node => {
-    if (!searchQuery) return true;
-    const nodeData = node.data as NodeData;
-    return nodeData.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           nodeData.description?.toLowerCase().includes(searchQuery.toLowerCase());
-  }).map(node => ({
-    ...node,
-    data: {
-      ...node.data,
-      onShowTooltip: handleShowTooltip,
-      onHideTooltip: handleHideTooltip
+  // Process nodes for display (add handlers and apply search)
+  const processedNodes = React.useMemo(() => {
+    let nodesToProcess = nodes;
+    
+    // Add tooltip handlers
+    nodesToProcess = nodesToProcess.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        onShowTooltip: handleShowTooltip,
+        onHideTooltip: handleHideTooltip
+      }
+    }));
+    
+    // Apply search filter if needed
+    if (searchQuery) {
+      nodesToProcess = nodesToProcess.filter(node => {
+        const nodeData = node.data as NodeData;
+        const matchesSearch = nodeData.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                             nodeData.description?.toLowerCase().includes(searchQuery.toLowerCase());
+        // If searching, override the hidden property to show matching nodes
+        return matchesSearch;
+      }).map(node => ({
+        ...node,
+        hidden: false // Show nodes that match search even if they would normally be hidden
+      }));
     }
-  }));
+    
+    return nodesToProcess;
+  }, [nodes, searchQuery, handleShowTooltip, handleHideTooltip]);
   
-  const nodesToDisplay = searchQuery ? filteredNodes : displayNodes.map(node => ({
-    ...node,
-    data: {
-      ...node.data,
-      onShowTooltip: handleShowTooltip,
-      onHideTooltip: handleHideTooltip
+  console.log('[App] Final check - nodes state:', nodes.length, 'processed:', processedNodes.length);
+  if (processedNodes.length > 0 && processedNodes[0].position) {
+    console.log('[App] First processed node:', processedNodes[0].id, 'at', processedNodes[0].position);
+  }
+  
+  // Node display logic
+  
+  // Fit view when nodes are loaded
+  React.useEffect(() => {
+    if (nodes.length > 0 && reactFlowInstance) {
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 800 });
+      }, 100);
     }
-  }));
+  }, [nodes.length, reactFlowInstance]);
   
-  const visibleNodeIds = new Set(nodesToDisplay.map(n => n.id));
+  const visibleNodeIds = new Set(processedNodes.map(n => n.id));
   const filteredEdges = edges.filter(edge => 
     visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
   );
   
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
-      <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100">
-        <ReactFlow
-          nodes={nodesToDisplay}
+      <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100" style={{ width: '100%', height: '100vh' }}>
+        <div style={{ width: '100%', height: '100%' }}>
+          <ReactFlow
+          nodes={processedNodes}
           edges={filteredEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -593,8 +646,10 @@ function DocumentGraphInner() {
           onNodeClick={onNodeClick}
           onNodeDragStop={handleNodeDragStop}
           nodeTypes={nodeTypes}
-          fitView
           className="bg-transparent"
+          defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+          minZoom={0.1}
+          maxZoom={4}
         >
           <Background 
             color={darkMode ? '#374151' : '#e5e7eb'} 
@@ -673,6 +728,7 @@ function DocumentGraphInner() {
             </button>
           </Panel>
         </ReactFlow>
+        </div>
         
         {/* Add Node Modal */}
         {showAddModal && (

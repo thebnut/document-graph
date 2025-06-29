@@ -5,7 +5,20 @@ import { NodeData } from '../services/dataService';
 // Initialize ELK instance
 const elk = new ELK();
 
-// ELK layout options for radial layout
+// ELK layout options - using radial algorithm for circular layout
+export const elkLayoutOptions = {
+  'elk.algorithm': 'radial',
+  'elk.radial.centerOnRoot': 'true',
+  'elk.radial.orderId': 'inTrees',
+  'elk.radial.compactor': 'WEDGE_COMPACTION',
+  'elk.radial.optimizationCriteria': 'EDGE_LENGTH',
+  'elk.radial.sorter': 'POLAR_COORDINATE',
+  'elk.spacing.nodeNode': '80',
+  'elk.radial.radius': '250',
+  'elk.nodeLabels.placement': 'INSIDE V_CENTER H_CENTER',
+};
+
+// Radial layout options (currently buggy with our graph structure)
 export const elkRadialOptions = {
   'elk.algorithm': 'radial',
   'elk.radial.centerOnRoot': 'true',
@@ -14,7 +27,8 @@ export const elkRadialOptions = {
   'elk.radial.optimizationCriteria': 'EDGE_LENGTH',
   'elk.radial.sorter': 'POLAR_COORDINATE',
   'elk.spacing.nodeNode': '80',
-  'elk.radial.radius': '250', // Start people at reasonable distance from center
+  'elk.radial.radius': '250',
+  'elk.nodeLabels.placement': 'INSIDE V_CENTER H_CENTER',
 };
 
 // Virtual root node configuration
@@ -64,7 +78,11 @@ export const createVirtualRootEdges = (level1Nodes: Node<NodeData>[]): Edge[] =>
     target: node.id,
     type: 'straight',
     animated: false,
-    style: { opacity: 0 }, // Hide virtual edges
+    style: { 
+      opacity: 0, // Hide virtual edges
+      stroke: 'transparent',
+      strokeWidth: 0
+    },
   }));
 
 /**
@@ -125,32 +143,16 @@ const toElkEdge = (edge: Edge): ElkExtendedEdge => ({
 export const convertToElkGraph = async (
   nodes: Node<NodeData>[], 
   edges: Edge[],
-  expandedNodes: Set<string>
+  _expandedNodes: Set<string>
 ): Promise<ElkNode> => {
-  // Check if virtual root already exists
-  const hasVirtualRoot = nodes.some(n => n.id === VIRTUAL_ROOT_ID);
-  
-  let elkNodes: Node<NodeData>[];
-  let elkEdges: Edge[];
-  
-  if (!hasVirtualRoot) {
-    // Add virtual root and adjust existing nodes
-    const virtualRoot = createVirtualRoot();
-    const adjustedNodes = nodes.map(adjustNodeLevel);
-    const level1Nodes = nodes.filter(n => n.data.level === 1);
-    const virtualEdges = createVirtualRootEdges(level1Nodes.map(adjustNodeLevel));
-    
-    elkNodes = [virtualRoot, ...adjustedNodes];
-    elkEdges = [...edges, ...virtualEdges];
-  } else {
-    elkNodes = nodes;
-    elkEdges = edges;
-  }
+  // Skip virtual root completely - use nodes as-is
+  const elkNodes = nodes;
+  const elkEdges = edges;
 
   // Build ELK graph
   const elkGraph: ElkNode = {
     id: 'root',
-    layoutOptions: elkRadialOptions,
+    layoutOptions: elkLayoutOptions,
     children: elkNodes.map(toElkNode),
     edges: elkEdges.map(toElkEdge),
   };
@@ -182,6 +184,45 @@ export const applyElkLayout = (
 };
 
 /**
+ * Apply a simple circular fallback layout
+ */
+const applyFallbackLayout = (nodes: Node<NodeData>[]): Node<NodeData>[] => {
+  console.log('[elkAdapter] Applying fallback layout to', nodes.length, 'nodes');
+  const levelGroups = new Map<number, Node<NodeData>[]>();
+  
+  // Group nodes by level
+  nodes.forEach(node => {
+    const level = node.data.level;
+    if (!levelGroups.has(level)) {
+      levelGroups.set(level, []);
+    }
+    levelGroups.get(level)!.push(node);
+  });
+  
+  // Position nodes in a tree-like structure
+  const startX = 400;
+  const startY = 100;
+  const levelHeight = 200;
+  const nodeSpacing = 250;
+  
+  const result = nodes.map(node => {
+    const level = node.data.level;
+    const levelNodes = levelGroups.get(level) || [];
+    const nodeIndex = levelNodes.indexOf(node);
+    const levelWidth = levelNodes.length * nodeSpacing;
+    
+    const x = startX - (levelWidth / 2) + (nodeIndex * nodeSpacing) + (nodeSpacing / 2);
+    const y = startY + (level - 1) * levelHeight;
+    
+    return { ...node, position: { x, y } };
+  });
+  
+  console.log('[elkAdapter] Fallback layout complete, sample positions:', 
+    result.slice(0, 3).map(n => ({ id: n.id, pos: n.position })));
+  return result;
+};
+
+/**
  * Perform layout calculation using ELK
  */
 export const calculateElkLayout = async (
@@ -189,12 +230,33 @@ export const calculateElkLayout = async (
   edges: Edge[],
   expandedNodes: Set<string>
 ): Promise<Node<NodeData>[]> => {
+  console.log('[elkAdapter] calculateElkLayout called with', nodes.length, 'nodes and', edges.length, 'edges');
   try {
     const elkGraph = await convertToElkGraph(nodes, edges, expandedNodes);
+    console.log('[elkAdapter] ELK graph prepared:', elkGraph);
+    
+    // Debug the graph structure for radial layout
+    console.log('[elkAdapter] Graph structure debug:');
+    console.log('  - Root ID:', elkGraph.id);
+    console.log('  - Children count:', elkGraph.children?.length);
+    console.log('  - Edges count:', elkGraph.edges?.length);
+    console.log('  - Layout options:', elkGraph.layoutOptions);
+    
+    if (elkGraph.children && elkGraph.children.length > 0) {
+      console.log('  - First few nodes:', elkGraph.children.slice(0, 3).map(n => ({ id: n.id, width: n.width, height: n.height })));
+    }
+    if (elkGraph.edges && elkGraph.edges.length > 0) {
+      console.log('  - First few edges:', elkGraph.edges.slice(0, 3).map(e => ({ id: e.id, sources: e.sources, targets: e.targets })));
+    }
+    
     const layouted = await elk.layout(elkGraph);
-    return applyElkLayout(nodes, layouted);
+    console.log('[elkAdapter] ELK layout complete:', layouted);
+    const result = applyElkLayout(nodes, layouted);
+    console.log('[elkAdapter] Applied layout to nodes:', result);
+    return result;
   } catch (error) {
-    console.error('ELK layout failed:', error);
-    return nodes; // Return original nodes on error
+    console.error('[elkAdapter] ELK layout failed, using fallback:', error);
+    // Apply fallback layout on error
+    return applyFallbackLayout(nodes);
   }
 };

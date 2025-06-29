@@ -96,3 +96,63 @@ Consider component extraction, state management library integration, and data pe
 
 ### ReactFlow Integration
 The application heavily relies on ReactFlow for visualization. Understanding ReactFlow's API, particularly node/edge state management and custom node components, is essential for development.
+
+## Troubleshooting
+
+### Nodes Not Rendering in ReactFlow
+
+**Problem**: Canvas renders but nodes are not visible despite having positions.
+
+**Root Cause**: Mismatch between ReactFlow's internal state and the nodes being passed to it.
+
+**Solution**: Ensure you're using the `nodes` state from `useNodesState` hook correctly:
+
+```jsx
+// WRONG - causes nodes to not render
+const [nodes, setNodes] = useNodesState([]);
+const processedNodes = /* some processing */;
+<ReactFlow nodes={processedNodes} />
+
+// CORRECT - use the state managed by ReactFlow
+const [nodes, setNodes] = useNodesState([]);
+// Process nodes but update via setNodes
+useEffect(() => {
+  const processed = nodes.map(node => ({ ...node, /* processing */ }));
+  setNodes(processed);
+}, [dependencies]);
+<ReactFlow nodes={nodes} />
+```
+
+**Key Learning**: ReactFlow manages its own internal state through `useNodesState`. Always pass the `nodes` variable from this hook to the `<ReactFlow>` component, not a separately processed array. If you need to process nodes (add handlers, filter, etc.), do so through `setNodes` or return processed nodes in the state update.
+
+### Node Expansion Not Working Properly
+
+**Problem**: Clicking on expandable nodes doesn't show children, or requires clicking other nodes first.
+
+**Root Cause**: Incorrect visibility logic showing nodes that shouldn't be visible yet.
+
+**Solution**: Use ReactFlow's `hidden` property and ensure visibility logic matches hierarchy:
+
+1. **Use hidden property instead of filtering**:
+```javascript
+// Instead of filtering nodes out:
+const visibleNodes = nodes.filter(/* visibility logic */);
+
+// Mark them as hidden:
+const nodesWithVisibility = nodes.map(node => ({
+  ...node,
+  hidden: !shouldBeVisible(node, expandedNodes)
+}));
+```
+
+2. **Fix visibility levels** - Only show top-level nodes by default:
+```javascript
+// In elkLayoutService.ts
+// WRONG - shows too many levels
+if (nodeData.level <= 3) return true;
+
+// CORRECT - only show root and people
+if (nodeData.level <= 2) return true;
+```
+
+**Key Learning**: Hierarchical expansion requires precise visibility logic. Always verify which levels should be visible by default and ensure child nodes are only visible when ALL parent nodes in the chain are expanded.

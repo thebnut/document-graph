@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Node, Edge, useReactFlow } from 'reactflow';
 import { NodeData } from '../services/dataService';
 import { elkLayoutService } from '../services/elkLayoutService';
@@ -19,17 +19,36 @@ export const useElkLayout = ({
   const [isLayouting, setIsLayouting] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set([VIRTUAL_ROOT_ID]));
   const [allNodesData, setAllNodesData] = useState<Node<NodeData>[]>([]);
+  const layoutingRef = useRef(false);
 
   // Initialize nodes with virtual root
   useEffect(() => {
+    console.log('[useElkLayout] Initializing with nodes:', initialNodes.length);
     const { nodes: preparedNodes } = elkLayoutService.prepareNodesWithVirtualRoot(initialNodes);
+    console.log('[useElkLayout] Prepared nodes with virtual root:', preparedNodes.length, preparedNodes);
     setAllNodesData(preparedNodes);
+    // Start with only virtual root expanded - users will click to expand nodes
   }, [initialNodes]);
+
+  // Filter nodes based on expansion state
+  const getDisplayNodes = useCallback((nodes: Node<NodeData>[]): Node<NodeData>[] => {
+    const visibleNodes = elkLayoutService.filterVisibleNodes(nodes, expandedNodes);
+    console.log('[useElkLayout] getDisplayNodes: input', nodes.length, 'output', visibleNodes.length, visibleNodes);
+    return visibleNodes;
+  }, [expandedNodes]);
 
   // Apply layout whenever nodes or expansion state changes
   const applyLayout = useCallback(async (preserveManualPositions = true) => {
+    console.log('[useElkLayout] applyLayout called with', allNodesData.length, 'nodes and', edges.length, 'edges');
     if (allNodesData.length === 0) return;
     
+    // Prevent simultaneous layout calculations
+    if (layoutingRef.current) {
+      console.log('[useElkLayout] Layout already in progress, skipping');
+      return;
+    }
+    
+    layoutingRef.current = true;
     setIsLayouting(true);
     try {
       const layoutedNodes = await elkLayoutService.applyRadialLayout(
@@ -39,7 +58,19 @@ export const useElkLayout = ({
         preserveManualPositions
       );
       
-      onNodesChange(layoutedNodes);
+      console.log('[useElkLayout] Layout complete, nodes with positions:', layoutedNodes.length, layoutedNodes);
+      
+      // Mark nodes as hidden instead of filtering them out
+      const visibleNodeIds = new Set(getDisplayNodes(layoutedNodes).map(n => n.id));
+      const layoutedNodesWithVisibility = layoutedNodes.map(node => ({
+        ...node,
+        hidden: !visibleNodeIds.has(node.id)
+      }));
+      
+      console.log('[useElkLayout] Passing all nodes to ReactFlow with hidden property:', 
+        layoutedNodesWithVisibility.length, 
+        'visible:', layoutedNodesWithVisibility.filter(n => !n.hidden).length);
+      onNodesChange(layoutedNodesWithVisibility);
       
       // Update internal state
       setAllNodesData(prev => {
@@ -53,23 +84,31 @@ export const useElkLayout = ({
       console.error('Layout failed:', error);
     } finally {
       setIsLayouting(false);
+      layoutingRef.current = false;
     }
-  }, [allNodesData, edges, expandedNodes, onNodesChange]);
+  }, [allNodesData, edges, expandedNodes, onNodesChange, getDisplayNodes]);
 
   // Handle node expansion/collapse
   const toggleNodeExpansion = useCallback((nodeId: string) => {
+    console.log('[useElkLayout] toggleNodeExpansion called for:', nodeId);
     if (nodeId === VIRTUAL_ROOT_ID) return; // Virtual root always expanded
     
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
+      console.log('[useElkLayout] Current expandedNodes:', Array.from(prev));
+      
       if (newSet.has(nodeId)) {
         // Collapsing: remove this node and all descendants
         newSet.delete(nodeId);
+        console.log('[useElkLayout] Collapsing node:', nodeId);
         // TODO: Get descendants and remove them too
       } else {
         // Expanding: add this node
         newSet.add(nodeId);
+        console.log('[useElkLayout] Expanding node:', nodeId);
       }
+      
+      console.log('[useElkLayout] New expandedNodes:', Array.from(newSet));
       return newSet;
     });
   }, []);
@@ -106,31 +145,25 @@ export const useElkLayout = ({
     }, 100);
   }, [allNodesData, applyLayout, reactFlowInstance]);
 
-  // Filter nodes for display (hide virtual root if configured)
-  const getDisplayNodes = useCallback((nodes: Node<NodeData>[]): Node<NodeData>[] => {
-    return nodes.map(node => {
-      if (node.data.isVirtual && node.data.hideInView) {
-        // Make virtual root invisible but keep it in the layout
-        return {
-          ...node,
-          hidden: true,
-          style: { opacity: 0, pointerEvents: 'none' },
-        };
-      }
-      return node;
-    });
-  }, []);
-
   // Apply initial layout
   useEffect(() => {
-    if (allNodesData.length > 0) {
+    console.log('[useElkLayout] Initial layout effect triggered - nodes:', allNodesData.length, 'edges:', edges.length);
+    if (allNodesData.length > 0 && expandedNodes.size > 0 && edges.length > 0) {
       applyLayout();
     }
-  }, [expandedNodes, allNodesData.length, applyLayout]); // Re-layout when expansion changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allNodesData.length, edges]); // Run when nodes and edges are loaded
+  
+  // Apply layout when expansion changes
+  useEffect(() => {
+    if (allNodesData.length > 0 && expandedNodes.size > 0 && edges.length > 0) {
+      applyLayout();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedNodes]); // Re-layout when expansion changes
 
   return {
     nodes: allNodesData,
-    displayNodes: getDisplayNodes(allNodesData),
     expandedNodes,
     isLayouting,
     toggleNodeExpansion,

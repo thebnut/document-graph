@@ -23,7 +23,7 @@
       "hasChildren": true
     },
     {
-      "id": "home",
+      "id": "home-property",
       "label": "22 Banya St",
       "type": "asset",
       "subtype": "property",
@@ -48,7 +48,7 @@
       "description": "RACQ Home Insurance\nPolicy: HM-789456123",
       "expiry": "2025-08-15",
       "level": 3,
-      "parentIds": ["home"],
+      "parentIds": ["home-property"],
       "hasChildren": false
     },
     {
@@ -57,7 +57,7 @@
       "type": "document",
       "description": "Estee - House Cleaner\n$560/week\nContact: 0412 345 678",
       "level": 3,
-      "parentIds": ["home"],
+      "parentIds": ["home-property"],
       "hasChildren": false
     },
     {
@@ -66,7 +66,7 @@
       "type": "document",
       "description": "Elliot - Gardener\n$150/fortnight\nContact: 0423 456 789",
       "level": 3,
-      "parentIds": ["home"],
+      "parentIds": ["home-property"],
       "hasChildren": false
     },
     {
@@ -131,14 +131,14 @@
   ],
   "relationships": [
     {
-      "id": "brett-home",
+      "id": "brett-home-property",
       "source": "brett",
-      "target": "home"
+      "target": "home-property"
     },
     {
-      "id": "gemma-home",
+      "id": "gemma-home-property",
       "source": "gemma",
-      "target": "home"
+      "target": "home-property"
     },
     {
       "id": "brett-docs",
@@ -151,18 +151,18 @@
       "target": "family-docs"
     },
     {
-      "id": "home-insurance",
-      "source": "home",
+      "id": "home-property-insurance",
+      "source": "home-property",
       "target": "insurance"
     },
     {
-      "id": "home-cleaner",
-      "source": "home",
+      "id": "home-property-cleaner",
+      "source": "home-property",
       "target": "cleaner"
     },
     {
-      "id": "home-gardener",
-      "source": "home",
+      "id": "home-property-gardener",
+      "source": "home-property",
       "target": "gardener"
     },
     {

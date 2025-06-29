@@ -19,7 +19,10 @@ export class ElkLayoutService {
     const hasVirtualRoot = nodes.some(n => n.id === VIRTUAL_ROOT_ID);
     
     if (hasVirtualRoot) {
-      return { nodes, edges: [] };
+      // If virtual root exists, create edges for level 2 nodes (originally level 1)
+      const level2Nodes = nodes.filter(n => n.data.level === 2 && !n.data.isVirtual);
+      const virtualEdges = createVirtualRootEdges(level2Nodes);
+      return { nodes, edges: virtualEdges };
     }
 
     // Create virtual root
@@ -55,21 +58,31 @@ export class ElkLayoutService {
     allNodes: Node<NodeData>[],
     expandedNodes: Set<string>
   ): Node<NodeData>[] {
+    console.log('[elkLayoutService] filterVisibleNodes called with', allNodes.length, 'nodes, expandedNodes:', expandedNodes);
     return allNodes.filter(node => {
       const nodeData = node.data;
 
       // Always show virtual root
-      if (nodeData.isVirtual) return true;
+      if (nodeData.isVirtual) {
+        console.log('[elkLayoutService] Showing virtual root');
+        return true;
+      }
 
-      // Always show level 1 and 2 (adjusted from original 1 and 2)
-      if (nodeData.level <= 2) return true;
+      // Always show level 1 and 2 (virtual root and people)
+      // Note: levels are adjusted +1 from original (1->2, 2->3, etc.)
+      if (nodeData.level <= 2) {
+        console.log('[elkLayoutService] Showing node', node.id, 'level', nodeData.level, 'hasChildren:', nodeData.hasChildren);
+        return true;
+      }
 
-      // For other nodes, check if ALL parent nodes in the chain are expanded
+      // For other nodes (level 4+), check if ALL parent nodes in the chain are expanded
+      console.log('[elkLayoutService] Checking node', node.id, 'level', nodeData.level, 'parents:', nodeData.parentIds);
       if (nodeData.parentIds) {
         // Check immediate parent first
         const immediateParentExpanded = nodeData.parentIds.some(parentId => 
           expandedNodes.has(parentId)
         );
+        console.log('[elkLayoutService] Parent expanded check:', immediateParentExpanded, 'for parents:', nodeData.parentIds);
         if (!immediateParentExpanded) return false;
 
         // For level 4+ nodes, also check if grandparent is expanded
@@ -102,14 +115,18 @@ export class ElkLayoutService {
     // Prepare nodes with virtual root
     const { nodes: preparedNodes, edges: virtualEdges } = this.prepareNodesWithVirtualRoot(nodes);
     
-    // Combine all edges
+    // Combine virtual edges with existing edges
     const allEdges = [...edges, ...virtualEdges];
     
-    // Filter visible nodes
-    const visibleNodes = this.filterVisibleNodes(preparedNodes, expandedNodes);
+    // Filter edges to only include those between visible nodes
+    const visibleNodeIds = new Set(preparedNodes.map(n => n.id));
+    const visibleEdges = allEdges.filter(edge => 
+      visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target)
+    );
     
-    // Calculate layout
-    const layoutedNodes = await calculateElkLayout(visibleNodes, allEdges, expandedNodes);
+    // Layout ALL nodes, not just visible ones
+    // This ensures all nodes have positions
+    const layoutedNodes = await calculateElkLayout(preparedNodes, visibleEdges, expandedNodes);
     
     // Preserve manual positions if requested
     if (preserveManualPositions) {
