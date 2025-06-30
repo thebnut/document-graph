@@ -70,7 +70,12 @@ export const useElkLayout = ({
       console.log('[useElkLayout] Passing all nodes to ReactFlow with hidden property:', 
         layoutedNodesWithVisibility.length, 
         'visible:', layoutedNodesWithVisibility.filter(n => !n.hidden).length);
-      onNodesChange(layoutedNodesWithVisibility);
+      
+      // Use setNodes to update ReactFlow state
+      if (typeof onNodesChange === 'function') {
+        // If it's the setNodes function from useNodesState, call it directly
+        onNodesChange(layoutedNodesWithVisibility);
+      }
       
       // Update internal state
       setAllNodesData(prev => {

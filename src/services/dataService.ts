@@ -6,6 +6,9 @@ import expandedSampleData from '../data/expandedSampleData.json';
 export interface NodeData extends EntityWithComputed {
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
   onHideTooltip?: () => void;
+  originalId?: string; // For duplicated nodes, reference to original entity
+  isShared?: boolean; // Indicates this is a shared asset
+  sharedWith?: string[]; // Other parents this asset is shared with
 }
 
 export class DataService {
@@ -40,17 +43,45 @@ export class DataService {
    */
   entitiesToNodes(entities?: Entity[]): Node<NodeData>[] {
     const entitiesToConvert = entities || this.model.entities;
+    const processedNodes: Node<NodeData>[] = [];
     
-    return entitiesToConvert.map(entity => ({
-      id: entity.id,
-      type: 'entity',
-      position: { x: 0, y: 0 }, // Will be calculated by layout algorithm
-      data: {
-        ...entity,
-        isExpanded: false,
-        isManuallyPositioned: false
-      } as NodeData
-    }));
+    entitiesToConvert.forEach(entity => {
+      // Check if entity has multiple parents (shared asset)
+      if (entity.parentIds && entity.parentIds.length > 1) {
+        // Create a duplicate node for each parent to maintain tree structure
+        entity.parentIds.forEach((parentId, index) => {
+          processedNodes.push({
+            id: `${entity.id}-${parentId}`, // Unique ID for each duplicate
+            type: 'entity',
+            position: { x: 0, y: 0 },
+            data: {
+              ...entity,
+              id: `${entity.id}-${parentId}`, // Update the data ID too
+              parentIds: [parentId], // Single parent for tree structure
+              originalId: entity.id, // Keep reference to original
+              isShared: true, // Mark as shared asset
+              sharedWith: entity.parentIds?.filter(p => p !== parentId) || [], // Other parents
+              isExpanded: false,
+              isManuallyPositioned: false
+            } as NodeData
+          });
+        });
+      } else {
+        // Regular node with single or no parent
+        processedNodes.push({
+          id: entity.id,
+          type: 'entity',
+          position: { x: 0, y: 0 },
+          data: {
+            ...entity,
+            isExpanded: false,
+            isManuallyPositioned: false
+          } as NodeData
+        });
+      }
+    });
+    
+    return processedNodes;
   }
 
   /**
@@ -58,15 +89,37 @@ export class DataService {
    */
   relationshipsToEdges(relationships?: EntityRelationship[]): Edge[] {
     const relationshipsToConvert = relationships || this.model.relationships;
+    const processedEdges: Edge[] = [];
     
-    return relationshipsToConvert.map(rel => ({
-      id: rel.id,
-      source: rel.source,
-      target: rel.target,
-      type: rel.type || 'straight',
-      animated: false,
-      label: rel.label
-    }));
+    relationshipsToConvert.forEach(rel => {
+      // Check if the target has multiple parents (was duplicated)
+      const targetEntity = this.model.entities.find(e => e.id === rel.target);
+      
+      if (targetEntity && targetEntity.parentIds && targetEntity.parentIds.length > 1) {
+        // Create edge to the appropriate duplicate based on source
+        const duplicateTargetId = `${rel.target}-${rel.source}`;
+        processedEdges.push({
+          id: `${rel.id}-duplicate`,
+          source: rel.source,
+          target: duplicateTargetId,
+          type: rel.type || 'straight',
+          animated: false,
+          label: rel.label
+        });
+      } else {
+        // Regular edge
+        processedEdges.push({
+          id: rel.id,
+          source: rel.source,
+          target: rel.target,
+          type: rel.type || 'straight',
+          animated: false,
+          label: rel.label
+        });
+      }
+    });
+    
+    return processedEdges;
   }
 
   /**

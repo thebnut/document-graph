@@ -50,7 +50,8 @@ import {
   Banknote,
   IdCard,
   Hospital,
-  Stethoscope
+  Stethoscope,
+  Link2
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
@@ -218,6 +219,11 @@ const EntityNode = ({
       return 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500';
     }
     
+    // Shared assets have a special color scheme
+    if (data.isShared) {
+      return 'bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 ring-2 ring-yellow-300';
+    }
+    
     switch (data.type) {
       case 'person':
       case 'pet':
@@ -369,6 +375,13 @@ const EntityNode = ({
           </div>
         )}
         
+        {/* Shared asset indicator */}
+        {data.isShared && (
+          <div className="absolute top-1 right-1 bg-white/90 rounded-full p-1" title="Shared Asset">
+            <Link2 className="w-3 h-3 text-orange-600" />
+          </div>
+        )}
+        
         {/* Handles for edge connections */}
         <Handle 
           type="source" 
@@ -479,7 +492,7 @@ function DocumentGraphInner() {
     const nodeData = node.data as NodeData;
     if (nodeData.hasChildren) {
       // Check what children this node has
-      const children = nodes.filter(n => 
+      const children = elkNodes.filter(n => 
         (n.data as NodeData).parentIds?.includes(node.id)
       );
       console.log('[App] Node children found:', children.length, children.map(c => c.id));
@@ -494,7 +507,7 @@ function DocumentGraphInner() {
       setTimeout(() => {
         if (willBeExpanded) {
           // If expanded, focus on node and its children
-          const updatedChildren = nodes.filter(n => 
+          const updatedChildren = elkNodes.filter(n => 
             (n.data as NodeData).parentIds?.includes(node.id)
           );
           const nodesToFit = [node, ...updatedChildren];
@@ -515,7 +528,7 @@ function DocumentGraphInner() {
         }
       }, 300); // Wait for layout to complete
     }
-  }, [expandedNodes, toggleNodeExpansion, nodes, reactFlowInstance]);
+  }, [expandedNodes, toggleNodeExpansion, elkNodes, reactFlowInstance]);
   
   // Track mouse position for distance-based hiding
   const mousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -637,7 +650,7 @@ function DocumentGraphInner() {
   
   // Process nodes for display (add handlers and apply search)
   const processedNodes = React.useMemo(() => {
-    let nodesToProcess = nodes;
+    let nodesToProcess = elkNodes;
     
     // Add tooltip handlers
     nodesToProcess = nodesToProcess.map(node => ({
@@ -664,9 +677,9 @@ function DocumentGraphInner() {
     }
     
     return nodesToProcess;
-  }, [nodes, searchQuery, handleShowTooltip, handleHideTooltip]);
+  }, [elkNodes, searchQuery, handleShowTooltip, handleHideTooltip]);
   
-  console.log('[App] Final check - nodes state:', nodes.length, 'processed:', processedNodes.length);
+  console.log('[App] Final check - nodes state:', nodes.length, 'elkNodes:', elkNodes.length, 'processed:', processedNodes.length);
   if (processedNodes.length > 0 && processedNodes[0].position) {
     console.log('[App] First processed node:', processedNodes[0].id, 'at', processedNodes[0].position);
   }
@@ -675,12 +688,12 @@ function DocumentGraphInner() {
   
   // Fit view when nodes are loaded
   React.useEffect(() => {
-    if (nodes.length > 0 && reactFlowInstance) {
+    if (elkNodes.length > 0 && reactFlowInstance) {
       setTimeout(() => {
         reactFlowInstance.fitView({ padding: 0.2, duration: 800 });
       }, 100);
     }
-  }, [nodes.length, reactFlowInstance]);
+  }, [elkNodes.length, reactFlowInstance]);
   
   const visibleNodeIds = new Set(processedNodes.map(n => n.id));
   const filteredEdges = edges.filter(edge => 
@@ -903,6 +916,14 @@ function DocumentGraphInner() {
             )}
             {tooltipState.data.ownership === 'shared' && (
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">Shared Asset</p>
+            )}
+            {tooltipState.data.isShared && tooltipState.data.sharedWith && (
+              <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                Shared with: {tooltipState.data.sharedWith.map(id => {
+                  const entity = dataService.getEntityById(id);
+                  return entity?.label || id;
+                }).join(', ')}
+              </p>
             )}
             {tooltipState.data.source && (
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Source: {tooltipState.data.source}</p>

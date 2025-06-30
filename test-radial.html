@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ELK Radial Test</title>
+    <script src="https://unpkg.com/elkjs@0.10.1/lib/elk.bundled.js"></script>
+</head>
+<body>
+    <h1>ELK Radial Layout Test</h1>
+    <pre id="output"></pre>
+    
+    <script>
+        const elk = new ELK();
+        
+        // Test graph with hierarchical structure
+        const graph = {
+            id: 'root',
+            layoutOptions: {
+                'elk.algorithm': 'radial',
+                'elk.radial.centerOnRoot': 'true',
+                'elk.spacing.nodeNode': '80',
+                'elk.radial.radius': '250',
+            },
+            children: [
+                {
+                    id: 'virtual-root',
+                    width: 100,
+                    height: 100,
+                    children: [
+                        {
+                            id: 'brett',
+                            width: 100,
+                            height: 100,
+                            children: [
+                                {
+                                    id: 'brett-identity',
+                                    width: 80,
+                                    height: 80
+                                }
+                            ]
+                        },
+                        {
+                            id: 'gemma',
+                            width: 100,
+                            height: 100
+                        }
+                    ]
+                }
+            ]
+        };
+        
+        elk.layout(graph)
+            .then(result => {
+                document.getElementById('output').textContent = 
+                    'Success!\n' + JSON.stringify(result, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('output').textContent = 
+                    'Error: ' + error.message + '\n' + error.stack;
+            });
+    </script>
+</body>
+</html>
