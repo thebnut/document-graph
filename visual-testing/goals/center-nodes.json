@@ -1,0 +1,18 @@
+{
+  "name": "center-person-nodes",
+  "description": "Ensure Brett and Gemma nodes are centered in the viewport",
+  "targetUrl": "http://localhost:3000",
+  "checks": [
+    "Brett and Gemma nodes should be visible in the center of the screen",
+    "Both nodes should be at the same vertical level",
+    "Nodes should have appropriate spacing between them",
+    "The ReactFlow canvas should be properly initialized"
+  ],
+  "setupActions": [
+    {
+      "type": "wait",
+      "selector": ".react-flow__node",
+      "timeout": 5000
+    }
+  ]
+}
