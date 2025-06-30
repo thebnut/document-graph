@@ -1,10 +1,70 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, ZoomIn, ZoomOut, RotateCw, Download } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { X, ZoomIn, ZoomOut, RotateCw, Download, Loader } from 'lucide-react';
 import { useDocumentViewer } from '../contexts/DocumentViewerContext';
 
 interface DocumentViewerProps {
   darkMode: boolean;
 }
+
+// Custom hook for fetching documents as blobs
+const useDocumentBlob = (documentPath: string | undefined, isOpen: boolean) => {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!documentPath || !isOpen) {
+      return;
+    }
+
+    let cancelled = false;
+    const fetchDocument = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // For now, we'll use the direct path, but this is where we'd add authentication
+        // In the future: const response = await fetch(documentPath, { headers: { Authorization: `Bearer ${token}` } });
+        const response = await fetch(documentPath);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch document: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        if (!cancelled) {
+          const url = URL.createObjectURL(blob);
+          setBlobUrl(url);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load document');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchDocument();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentPath, isOpen]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobUrl]);
+
+  return { blobUrl, loading, error };
+};
 
 export const DocumentViewer: React.FC<DocumentViewerProps> = ({ 
   darkMode 
@@ -14,6 +74,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const [rotation, setRotation] = useState(0);
   const [imageError, setImageError] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Fetch document as blob
+  const { blobUrl, loading: documentLoading, error: documentError } = useDocumentBlob(entity?.documentPath, isOpen);
 
   // Reset state when entity changes
   useEffect(() => {
@@ -52,14 +115,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
     setRotation(prev => (prev + 90) % 360);
   };
 
-  const handleDownload = () => {
-    if (entity?.documentPath) {
+  const handleDownload = useCallback(() => {
+    if (blobUrl && entity) {
       const link = document.createElement('a');
-      link.href = entity.documentPath;
-      link.download = entity.documentMetadata?.fileName || 'document';
+      link.href = blobUrl;
+      link.download = entity.documentMetadata?.fileName || entity.label || 'document';
       link.click();
     }
-  };
+  }, [blobUrl, entity]);
 
   const renderDocumentContent = () => {
     if (!entity?.documentPath) {
@@ -70,12 +133,29 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       );
     }
 
-    if (imageError) {
+    // Show loading state
+    if (documentLoading) {
       return (
-        <div className="flex items-center justify-center h-full text-red-500 dark:text-red-400">
-          Failed to load document
+        <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <Loader className="w-8 h-8 animate-spin mb-2" />
+          Loading document...
         </div>
       );
+    }
+
+    // Show error state
+    if (documentError || imageError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-red-500 dark:text-red-400">
+          <p className="mb-2">Failed to load document</p>
+          <p className="text-sm">{documentError || 'Unknown error'}</p>
+        </div>
+      );
+    }
+
+    // Show content when blob URL is ready
+    if (!blobUrl) {
+      return null;
     }
 
     if (entity.documentType === 'image') {
@@ -86,7 +166,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         >
           <div className="flex items-center justify-center min-h-full p-8">
             <img
-              src={entity.documentPath}
+              src={blobUrl}
               alt={entity.label}
               className="max-w-full h-auto shadow-xl"
               style={{
@@ -103,8 +183,13 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
     if (entity.documentType === 'pdf') {
       return (
-        <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-          PDF viewer coming soon...
+        <div className="w-full h-full bg-gray-100 dark:bg-gray-900">
+          <iframe
+            src={blobUrl}
+            title={entity.label}
+            className="w-full h-full border-0"
+            style={{ minHeight: '600px' }}
+          />
         </div>
       );
     }
@@ -155,33 +240,37 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
         </div>
 
         {/* Toolbar */}
-        {entity?.documentType === 'image' && !imageError && (
+        {entity && blobUrl && !documentError && !imageError && (
           <div className="flex items-center gap-2 p-4 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={handleZoomIn}
-              className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Zoom in"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleZoomOut}
-              className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Zoom out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded">
-              {zoom}%
-            </span>
-            <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
-            <button
-              onClick={handleRotate}
-              className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Rotate"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
+            {entity.documentType === 'image' && (
+              <>
+                <button
+                  onClick={handleZoomIn}
+                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Zoom in"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleZoomOut}
+                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Zoom out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 rounded">
+                  {zoom}%
+                </span>
+                <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-2" />
+                <button
+                  onClick={handleRotate}
+                  className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Rotate"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+              </>
+            )}
             <button
               onClick={handleDownload}
               className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
