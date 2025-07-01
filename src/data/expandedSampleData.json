@@ -10,9 +10,9 @@
       "id": "brett",
       "label": "Brett Thebault",
       "type": "person",
-      "description": "Father, primary account holder",
+      "description": "Father, boss man, primary account holder",
       "level": 1,
-      "hasChildren": true
+      "hasChildren": true 
     },
     {
       "id": "gemma",

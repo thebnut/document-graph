@@ -1,8 +1,8 @@
-# 📘 Project Brief: Personal Document Graph (Bubble App)
+# 📘 Project Brief: Personal Document Graph or Family Map app
 
 ## 🔍 Overview
 
-This project aims to build a **cross-platform personal documentation system** that allows users to visually capture, organise, and explore their important life documents and relationships in an intuitive, mind-map-like interface known as the **Document Graph**.
+This project aims to build a **cross-platform personal documentation system** that allows users to visually capture, organise, and explore their important life documents and relationships in an intuitive, mind-map-like interface known as the **Document Graph** or **Family Map**
 
 The platform will be accessible via both **mobile and web**, offering a consistent, user-friendly experience across devices.
 
