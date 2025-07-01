@@ -6,6 +6,10 @@ import expandedSampleData from '../data/expandedSampleData.json';
 export interface NodeData extends EntityWithComputed {
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
   onHideTooltip?: () => void;
+  isRootNode?: boolean;
+  layoutAngle?: number;
+  layoutRadius?: number;
+  layoutDepth?: number;
 }
 
 export class DataService {

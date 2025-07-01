@@ -48,11 +48,13 @@ import {
   HeartPulse,
   Banknote,
   IdCard,
-  Hospital
+  Hospital,
+  Dog
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
 import { DocumentViewer } from './components/DocumentViewer';
+import { D3RadialLayoutEngine } from './services/d3RadialLayoutEngine';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -188,7 +190,8 @@ const EntityNode = ({
   
   // Different sizes for different node types
   const getNodeSize = () => {
-    if (data.level === 1) return 'w-32 h-32'; // Largest for central nodes
+    if (data.level === 0) return 'w-44 h-44'; // Family root node - largest
+    if (data.level === 1) return 'w-32 h-32'; // People nodes
     switch (data.type) {
       case 'person':
         return 'w-28 h-28';
@@ -206,6 +209,11 @@ const EntityNode = ({
   };
   
   const getNodeColor = () => {
+    // Special color for family root node
+    if (data.isRootNode || data.level === 0) {
+      return 'bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700';
+    }
+    
     switch (data.type) {
       case 'person':
       case 'pet':
@@ -232,7 +240,12 @@ const EntityNode = ({
   };
   
   const getIcon = () => {
-    const iconClass = data.type === 'person' || data.level === 1 ? 'w-8 h-8' : 'w-6 h-6';
+    const iconClass = data.type === 'person' || data.level === 1 || data.level === 0 ? 'w-8 h-8' : 'w-6 h-6';
+    
+    // Special icon for family root node
+    if (data.level === 0) {
+      return <Trees className={iconClass} />;
+    }
     
     // Handle folders first
     if (data.type === 'folder') {
@@ -391,6 +404,9 @@ function DocumentGraphInner() {
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTooltipHovered, setIsTooltipHovered] = useState(false);
   
+  // Initialize layout engine
+  const layoutEngine = useRef(new D3RadialLayoutEngine());
+  
   // Store all nodes data
   const [allNodesData, setAllNodesData] = useState<Node[]>([]);
   
@@ -409,115 +425,6 @@ function DocumentGraphInner() {
     description: '',
   });
   
-  // Auto-layout function with better spacing
-  const autoLayout = (nodes: Node[], preserveManualPositions = false) => {
-    const centerX = 400;
-    const centerY = 300;
-    const level2Radius = 250;
-    const level3Radius = 200;
-    const level4Spacing = 150;
-    
-    const layoutNodes = [...nodes];
-    
-    // Position level 1 (central) nodes
-    const level1Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 1);
-    level1Nodes.forEach((node, index) => {
-      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        node.position = {
-          x: centerX + (index === 0 ? -100 : 100),
-          y: centerY
-        };
-      }
-    });
-    
-    // Position level 2 nodes in a circle around center
-    const level2Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 2);
-    const angleStep2 = (2 * Math.PI) / Math.max(level2Nodes.length, 1);
-    level2Nodes.forEach((node, index) => {
-      if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-        const angle = index * angleStep2 - Math.PI / 2;
-        node.position = {
-          x: centerX + Math.cos(angle) * level2Radius,
-          y: centerY + Math.sin(angle) * level2Radius
-        };
-      }
-    });
-    
-    // Position level 3 nodes with proper spacing
-    const level3NodesByParent = new Map<string, Node[]>();
-    const level3Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 3);
-    
-    level3Nodes.forEach(node => {
-      const parentId = (node.data as NodeData).parentIds?.[0];
-      if (parentId) {
-        if (!level3NodesByParent.has(parentId)) {
-          level3NodesByParent.set(parentId, []);
-        }
-        level3NodesByParent.get(parentId)!.push(node);
-      }
-    });
-    
-    level3NodesByParent.forEach((children, parentId) => {
-      const parent = layoutNodes.find(n => n.id === parentId);
-      if (parent) {
-        const parentAngle = Math.atan2(parent.position.y - centerY, parent.position.x - centerX);
-        const spreadAngle = Math.min(Math.PI / 3, (Math.PI / 6) * children.length);
-        const angleStep = children.length > 1 ? spreadAngle / (children.length - 1) : 0;
-        
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const childAngle = parentAngle + (index - (children.length - 1) / 2) * angleStep;
-            node.position = {
-              x: parent.position.x + Math.cos(childAngle) * level3Radius,
-              y: parent.position.y + Math.sin(childAngle) * level3Radius
-            };
-          }
-        });
-      }
-    });
-    
-    // Position level 4 nodes with proper spacing
-    const level4NodesByParent = new Map<string, Node[]>();
-    const level4Nodes = layoutNodes.filter(n => (n.data as NodeData).level === 4);
-    
-    level4Nodes.forEach(node => {
-      const parentId = (node.data as NodeData).parentIds?.[0];
-      if (parentId) {
-        if (!level4NodesByParent.has(parentId)) {
-          level4NodesByParent.set(parentId, []);
-        }
-        level4NodesByParent.get(parentId)!.push(node);
-      }
-    });
-    
-    level4NodesByParent.forEach((children, parentId) => {
-      const parent = layoutNodes.find(n => n.id === parentId);
-      if (parent) {
-        const grandParent = layoutNodes.find(n => 
-          n.id === (parent.data as NodeData).parentIds?.[0]
-        );
-        
-        let baseAngle = Math.PI / 2; // Default downward
-        if (grandParent) {
-          baseAngle = Math.atan2(parent.position.y - grandParent.position.y, parent.position.x - grandParent.position.x);
-        }
-        
-        const spacing = 120;
-        
-        children.forEach((node, index) => {
-          if (!preserveManualPositions || !(node.data as NodeData).isManuallyPositioned) {
-            const offset = (index - (children.length - 1) / 2) * spacing;
-            node.position = {
-              x: parent.position.x + offset * Math.cos(baseAngle + Math.PI / 2),
-              y: parent.position.y + level4Spacing + offset * Math.sin(baseAngle + Math.PI / 2)
-            };
-          }
-        });
-      }
-    });
-    
-    return layoutNodes;
-  };
   
   // Get all descendant IDs recursively
   const getAllDescendantIds = useCallback((nodeId: string): string[] => {
@@ -565,10 +472,13 @@ function DocumentGraphInner() {
           
           // Apply layout to new children while preserving manual positions
           setTimeout(() => {
-            const updatedNodes = autoLayout(allNodesData, true);
-            setAllNodesData(updatedNodes);
+            const layoutResult = layoutEngine.current.calculateLayout(allNodesData, edges, {
+              preserveManualPositions: true
+            });
+            setAllNodesData(layoutResult.nodes);
+            // Note: We don't update edges here because they should already include family connections
             
-            const children = updatedNodes.filter(n => 
+            const children = layoutResult.nodes.filter(n => 
               (n.data as NodeData).parentIds?.includes(node.id)
             );
             const nodesToFit = [node, ...children];
@@ -670,24 +580,27 @@ function DocumentGraphInner() {
       }
     }));
     
-    // Apply auto-layout
-    const layoutedNodes = autoLayout(resetNodes);
-    setAllNodesData(layoutedNodes);
+    // Apply radial layout
+    const layoutResult = layoutEngine.current.calculateLayout(resetNodes, edges, {
+      preserveManualPositions: false
+    });
+    setAllNodesData(layoutResult.nodes);
+    // Note: We don't update edges here because they should already include family connections
     
-    // Focus on the center with level 1 and 2 nodes
+    // Focus on the center with family root, level 1 and 2 nodes
     setTimeout(() => {
-      const level12Nodes = layoutedNodes.filter(n => {
+      const centerNodes = layoutResult.nodes.filter(n => {
         const nodeData = n.data as NodeData;
-        return nodeData.level === 1 || nodeData.level === 2;
+        return nodeData.level === 0 || nodeData.level === 1 || nodeData.level === 2;
       });
       
       reactFlowInstance.fitView({
-        nodes: level12Nodes,
+        nodes: centerNodes,
         duration: 800,
         padding: 0.5,
       });
     }, 100);
-  }, [allNodesData, reactFlowInstance]);
+  }, [allNodesData, reactFlowInstance, edges]);
   
   const onConnect = useCallback(
     (_params: Connection) => {
@@ -739,21 +652,25 @@ function DocumentGraphInner() {
     const allNodes = dataService.entitiesToNodes();
     console.log('Loaded nodes from data service:', allNodes.length);
     
-    const layoutedNodes = autoLayout(allNodes);
-    setAllNodesData(layoutedNodes);
+    // Create edges from relationships
+    const edgesData = dataService.relationshipsToEdges();
+    console.log('Loaded edges from data service:', edgesData.length);
+    setEdges(edgesData);
     
-    // Only show level 1 and 2 nodes initially
-    const initialVisibleNodes = layoutedNodes.filter(n => {
+    // Apply radial layout with edges
+    const layoutResult = layoutEngine.current.calculateLayout(allNodes, edgesData, {
+      preserveManualPositions: false
+    });
+    setAllNodesData(layoutResult.nodes);
+    setEdges(layoutResult.edges); // Use enhanced edges with family connections
+    
+    // Initially show family root, level 1 (people), and level 2 (categories) nodes
+    const initialVisibleNodes = layoutResult.nodes.filter(n => {
       const nodeData = n.data as NodeData;
-      return nodeData.level === 1 || nodeData.level === 2;
+      return nodeData.level === 0 || nodeData.level === 1 || nodeData.level === 2;
     });
     
     setNodes(initialVisibleNodes);
-    
-    // Create edges from relationships
-    const edges = dataService.relationshipsToEdges();
-    console.log('Loaded edges from data service:', edges.length);
-    setEdges(edges);
   }, [setNodes, setEdges]);
   
   // Cleanup timeout on unmount
@@ -787,8 +704,8 @@ useEffect(() => {
   const visibleNodes = updatedAllNodes.filter(node => {
     const nodeData = node.data as NodeData;
 
-    // Always show level 1 and 2
-    if (nodeData.level === 1 || nodeData.level === 2) return true;
+    // Always show family root (level 0), level 1 and 2
+    if (nodeData.level === 0 || nodeData.level === 1 || nodeData.level === 2) return true;
 
     // For other nodes, check if ALL parent nodes in the chain are expanded
     if (nodeData.parentIds) {
@@ -804,6 +721,12 @@ useEffect(() => {
           const grandParentExpanded = grandParentIds.some(gpId => expandedNodes.has(gpId));
           if (!grandParentExpanded) return false;
         }
+      }
+
+      // For level 5 nodes (documents under family root), check if family root is expanded
+      if (nodeData.level === 5) {
+        const familyRootExpanded = expandedNodes.has('family-root');
+        if (!familyRootExpanded) return false;
       }
 
       return true;
