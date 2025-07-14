@@ -21,34 +21,54 @@ export {
 // New secure document reference
 export interface DocumentReference {
   id: string;
-  type: 'url' | 'blob' | 'external' | 'cloud';
-  location: string;             // Secure URL or cloud storage path
+  type: 'google-drive' | 'url' | 'blob' | 'external';
+  location: string;             // For Google Drive: 'google-drive://[fileId]'
   mimeType: string;
   fileName: string;
   fileSize?: number;
   
   // Security
   provider?: 'google-drive' | 'dropbox' | 'onedrive' | 'internal';
-  accessMethod?: 'direct' | 'oauth' | 'api-key';
+  accessMethod?: 'oauth2' | 'api-key' | 'direct';
   requiresAuth?: boolean;
-  accessToken?: string;         // Temporary access token
-  expiresAt?: string;          // ISO 8601 token expiration
   
   // Metadata
   uploadedAt: string;
   uploadedBy: string;
   lastModified?: string;
-  checksum?: string;           // SHA-256 for integrity
+  checksum?: string;           // MD5 or SHA-256 for integrity
   
   // Preview
   thumbnailUrl?: string;
   previewUrl?: string;
+  webViewLink?: string;        // View in Google Drive
   
-  // Cloud storage specific
-  cloudMetadata?: {
-    driveId?: string;
-    folderId?: string;
-    permissions?: string[];
+  // Google Drive specific
+  googleDriveMetadata?: {
+    fileId: string;
+    driveId?: string;          // Shared drive ID
+    folderId?: string;         // Parent folder ID
+    driveAccount: string;      // User's Google account
+    permissions?: Array<{
+      role: string;
+      emailAddress?: string;
+    }>;
+    owners?: Array<{
+      emailAddress: string;
+      displayName: string;
+    }>;
+    shared?: boolean;
+    capabilities?: {
+      canEdit: boolean;
+      canShare: boolean;
+      canDownload: boolean;
+    };
+    webContentLink?: string;   // Direct download link
+    iconLink?: string;         // File type icon
+    hasThumbnail?: boolean;
+    createdTime?: string;
+    modifiedTime?: string;
+    viewedByMeTime?: string;
   };
 }
 

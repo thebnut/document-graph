@@ -6,19 +6,16 @@
 import {
   StandaloneDocumentGraph,
   StandaloneEntity,
-  StandaloneRelationship,
   SearchIndex,
   Query,
   QueryResult,
   ValidationResult,
-  ChangeLogEntry,
-  DocumentReference
+  ChangeLogEntry
 } from './standalone-model';
 
 export class DocumentGraphModel {
   private data: StandaloneDocumentGraph;
   private searchIndex: SearchIndex;
-  private isDirty: boolean = false;
 
   constructor(data?: StandaloneDocumentGraph) {
     this.data = data || this.createEmptyGraph();
@@ -168,7 +165,6 @@ export class DocumentGraphModel {
 
     this.data.entities.push(newEntity);
     this.addToChangeLog('create', 'entity', newEntity.id, newEntity.label);
-    this.isDirty = true;
     
     // Update search index
     this.rebuildSearchIndex();
@@ -197,7 +193,6 @@ export class DocumentGraphModel {
 
     this.data.entities[entityIndex] = updatedEntity;
     this.addToChangeLog('update', 'entity', id, updatedEntity.label, changes);
-    this.isDirty = true;
     
     // Update search index
     this.rebuildSearchIndex();
@@ -223,7 +218,6 @@ export class DocumentGraphModel {
     );
     
     this.addToChangeLog('delete', 'entity', id, entity.label);
-    this.isDirty = true;
     
     // Update search index
     this.rebuildSearchIndex();
@@ -507,7 +501,7 @@ export class DocumentGraphModel {
   }
 
   private extractHighlights(entity: StandaloneEntity, searchText: string): string[] {
-    const highlights = [];
+    const highlights: string[] = [];
     const fields = [entity.label, entity.description, entity.tags?.join(' ')];
     
     fields.forEach(field => {
@@ -515,7 +509,7 @@ export class DocumentGraphModel {
         const index = field.toLowerCase().indexOf(searchText);
         const start = Math.max(0, index - 20);
         const end = Math.min(field.length, index + searchText.length + 20);
-        highlights.push('...' + field.substring(start, end) + '...');
+        highlights.push('...' + field.slice(start, end) + '...');
       }
     });
     
@@ -574,7 +568,7 @@ export function exampleUsage() {
   });
 
   // Add a document with secure reference
-  const passport = model.addEntity({
+  model.addEntity({
     label: 'Brett Passport',
     type: 'document',
     category: 'passport',
@@ -583,7 +577,7 @@ export function exampleUsage() {
     expiry: '2029-05-15',
     documents: [{
       id: 'doc-001',
-      type: 'cloud',
+      type: 'google-drive',
       location: 'google-drive://1234567890',
       mimeType: 'image/jpeg',
       fileName: 'brett-passport.jpg',
@@ -619,7 +613,7 @@ export function exampleUsage() {
   const json = model.toJSON();
 
   // Import
-  const imported = DocumentGraphModel.fromJSON(json);
+  DocumentGraphModel.fromJSON(json);
 
   return { model, results, expiring, validation };
 }
