@@ -264,3 +264,18 @@ For the complete vision and roadmap, see `project-vision.md`.
 - Add authentication and user management
 - Build document upload and processing pipeline
 - Create comprehensive test suite
+- **Migrate to standalone data model** (see src/data/standalone-model-spec.md)
+
+### Standalone Data Model (In Progress)
+The project is transitioning to a platform-agnostic data model that:
+- Works independently of ReactFlow or any UI framework
+- Supports secure document references via URLs with temporary tokens
+- Includes pre-computed search indices for offline functionality
+- Provides built-in change tracking and audit trails
+- Enables the same data to be consumed by web, mobile, and CLI tools
+
+See the following files for details:
+- `src/data/standalone-model-spec.md` - Specification and design
+- `src/data/standalone-model.ts` - Type definitions
+- `src/data/standalone-model-implementation.ts` - Reference implementation
+- `src/data/migration-guide.md` - Migration from current model
