@@ -185,8 +185,13 @@ export const defaultConfig: AppConfig = {
   }
 };
 
+// Deep partial type helper
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
 // Environment-specific overrides
-const envConfigs: Record<string, Partial<AppConfig>> = {
+const envConfigs: Record<string, DeepPartial<AppConfig>> = {
   development: {
     app: {
       domain: 'localhost:3000',
@@ -246,7 +251,7 @@ export class ConfigManager {
     return this.config;
   }
   
-  updateConfig(updates: Partial<AppConfig>): void {
+  updateConfig(updates: DeepPartial<AppConfig>): void {
     this.config = this.deepMerge(this.config, updates);
     this.saveConfig();
   }

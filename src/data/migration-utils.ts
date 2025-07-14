@@ -2,7 +2,7 @@
  * Migration utilities for converting existing data to standalone model with Google Drive
  */
 
-import { Entity, DocumentGraphModel as OldModel } from './model';
+import { Entity, EntityWithComputed, DocumentGraphModel as OldModel } from './model';
 import { 
   StandaloneEntity, 
   StandaloneDocumentGraph, 
@@ -137,10 +137,10 @@ export class DataMigration {
         searchableText: this.buildSearchableText(oldEntity),
         tags: this.extractTags(oldEntity),
         
-        // UI hints
+        // UI hints (these don't exist in old data, so use defaults)
         uiHints: {
-          expanded: oldEntity.isExpanded,
-          position: oldEntity.isManuallyPositioned ? { x: 0, y: 0 } : undefined
+          expanded: false,
+          position: undefined
         }
       };
       
@@ -337,7 +337,7 @@ export class DataMigration {
       });
     }
     
-    return [...new Set(tags)]; // Remove duplicates
+    return Array.from(new Set(tags)); // Remove duplicates
   }
   
   private mapRelationshipType(oldType?: string): any {

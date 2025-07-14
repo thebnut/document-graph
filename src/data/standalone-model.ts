@@ -3,8 +3,8 @@
  * Platform-agnostic implementation that can be used by any viewer
  */
 
-// Re-export existing types that are already standalone
-export { 
+// Import types for use in this file
+import type { 
   EntityType, 
   EntitySubtype, 
   DocumentCategory,
@@ -17,6 +17,21 @@ export {
   FinancialMetadata,
   InsuranceMetadata
 } from './model';
+
+// Re-export for external use
+export type { 
+  EntityType, 
+  EntitySubtype, 
+  DocumentCategory,
+  OwnershipType,
+  PassportMetadata,
+  DriverLicenceMetadata,
+  VehicleMetadata,
+  PropertyMetadata,
+  HealthMetadata,
+  FinancialMetadata,
+  InsuranceMetadata
+};
 
 // New secure document reference
 export interface DocumentReference {
