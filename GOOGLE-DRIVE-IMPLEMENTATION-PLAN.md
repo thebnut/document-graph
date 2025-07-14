@@ -1,7 +1,7 @@
 # Google Drive Authentication & File Management Implementation Plan
 
 ## Overview
-Implement Google Drive authentication on app load, create folder structure, and save the data model to Drive.
+Implement Google Drive authentication on app load, create folder structure, and save the data model to Drive. 
 
 ## Phase 1: Google Drive API Setup
 
