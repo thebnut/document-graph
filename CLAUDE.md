@@ -266,16 +266,47 @@ For the complete vision and roadmap, see `project-vision.md`.
 - Create comprehensive test suite
 - **Migrate to standalone data model** (see src/data/standalone-model-spec.md)
 
-### Standalone Data Model (In Progress)
-The project is transitioning to a platform-agnostic data model that:
+### Standalone Data Model (Implemented)
+The project has successfully transitioned to a platform-agnostic data model that:
 - Works independently of ReactFlow or any UI framework
-- Supports secure document references via URLs with temporary tokens
+- Supports secure document references via Google Drive
 - Includes pre-computed search indices for offline functionality
 - Provides built-in change tracking and audit trails
 - Enables the same data to be consumed by web, mobile, and CLI tools
 
-See the following files for details:
-- `src/data/standalone-model-spec.md` - Specification and design
-- `src/data/standalone-model.ts` - Type definitions
-- `src/data/standalone-model-implementation.ts` - Reference implementation
-- `src/data/migration-guide.md` - Migration from current model
+**Key Implementation Files:**
+- `src/data/standalone-model.ts` - Core type definitions with Google Drive support
+- `src/data/standalone-model-implementation.ts` - Full implementation with CRUD, search, validation
+- `src/data/google-drive-types.ts` - Comprehensive Google Drive integration types
+- `src/data/migration-utils.ts` - Automated migration from old to new format
+- `src/services/standaloneDataService.ts` - New service using standalone model
+- `src/services/dataService-adapter.ts` - Backward compatibility adapter
+- `src/config/app-config.ts` - Centralized configuration (domain: lifemap.au)
+
+**Current Status:**
+- ✅ App is running with the new standalone model
+- ✅ Single line change in App.tsx to switch models
+- ✅ All existing UI functionality preserved
+- ✅ TypeScript compilation issues resolved
+- 🔄 Google Drive authentication pending (see GOOGLE-DRIVE-IMPLEMENTATION-PLAN.md)
+
+### Important TypeScript Considerations
+When using Create React App with `--isolatedModules`:
+- Use `export type` for type-only exports
+- Use `import type` when importing types
+- For partial nested objects, use DeepPartial type helper
+- Use Array.from() instead of spread operator with Sets for ES compatibility
+
+### Data Model Migration
+The app automatically migrates from the old format to the new standalone model:
+1. On first load, `StandaloneDataService` detects old data
+2. `DataMigration` utility converts entities and relationships
+3. Documents are prepared for Google Drive (with placeholder IDs)
+4. The UI continues working through the adapter layer
+
+### Google Drive Integration (Next Phase)
+See `GOOGLE-DRIVE-IMPLEMENTATION-PLAN.md` for detailed implementation steps:
+- OAuth2 authentication flow
+- Folder structure: `lifemap-data/data-model/` and `lifemap-data/documents/`
+- Person-based document organization
+- Automatic sync of data model to Drive
