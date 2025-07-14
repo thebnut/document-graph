@@ -55,7 +55,6 @@ import { dataService, NodeData } from './services/dataService-adapter';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
 import { DocumentViewer } from './components/DocumentViewer';
 import { D3RadialLayoutEngine } from './services/d3RadialLayoutEngine';
-import { ModelChecker } from './components/ModelChecker';
 
 // Comprehensive ResizeObserver error suppression
 const suppressResizeObserverError = (e: any) => {
@@ -770,7 +769,6 @@ useEffect(() => {
   
   return (
     <div className={`h-screen ${darkMode ? 'dark' : ''}`}>
-      <ModelChecker />
       <div className="h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100">
         <ReactFlow
           nodes={nodesToDisplay}

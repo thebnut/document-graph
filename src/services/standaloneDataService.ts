@@ -14,12 +14,23 @@ import expandedSampleData from '../data/expandedSampleData.json';
 
 // NodeData interface for ReactFlow compatibility
 export interface NodeData extends StandaloneEntity {
+  // Callbacks
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
   onHideTooltip?: () => void;
+  
+  // Layout properties
   isRootNode?: boolean;
   layoutAngle?: number;
   layoutRadius?: number;
   layoutDepth?: number;
+  
+  // Backward compatibility properties (from old model)
+  hasChildren?: boolean;
+  isExpanded?: boolean;
+  isManuallyPositioned?: boolean;
+  source?: string;
+  documentPath?: string;
+  documentType?: 'image' | 'pdf' | 'other';
 }
 
 /**
@@ -41,7 +52,8 @@ export class StandaloneToReactFlowAdapter {
         documentType: this.getDocumentType(entity.documents?.[0]?.mimeType),
         hasChildren: (entity.childrenCount || 0) > 0,
         isExpanded: entity.uiHints?.expanded,
-        isManuallyPositioned: !!entity.uiHints?.position
+        isManuallyPositioned: !!entity.uiHints?.position,
+        source: entity.documents?.[0]?.location // Add source for backward compatibility
       } as NodeData
     };
   }
