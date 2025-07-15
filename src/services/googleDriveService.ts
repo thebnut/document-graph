@@ -3,7 +3,6 @@
  * Handles folder creation, file operations, and Drive API interactions
  */
 
-import { gapi } from 'gapi-script';
 import { googleAuthService } from './googleAuthService';
 import type { StandaloneDocumentGraph } from '../data/standalone-model';
 
@@ -33,6 +32,8 @@ class GoogleDriveService {
   private readonly DATA_MODEL_FOLDER = 'data-model';
   private readonly DOCUMENTS_FOLDER = 'documents';
   private readonly DATA_MODEL_FILE = 'document-graph.json';
+  private readonly DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
+  private readonly DRIVE_UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3';
   
   private constructor() {}
   
@@ -44,24 +45,38 @@ class GoogleDriveService {
   }
   
   /**
-   * Ensure the Drive API client is loaded
+   * Get authorization headers for API requests
    */
-  private async ensureDriveClient(): Promise<void> {
-    if (!googleAuthService.isAuthenticated()) {
-      throw new Error('User not authenticated');
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const token = googleAuthService.getAccessToken();
+    if (!token) {
+      throw new Error('Not authenticated');
     }
     
-    // Load Drive API if not already loaded
-    if (!gapi.client.drive) {
-      await gapi.client.load('drive', 'v3');
+    // Check if token needs refresh
+    if (googleAuthService.needsTokenRefresh()) {
+      await googleAuthService.refreshToken();
+      const newToken = googleAuthService.getAccessToken();
+      if (!newToken) {
+        throw new Error('Failed to refresh token');
+      }
+      return {
+        'Authorization': `Bearer ${newToken}`,
+        'Content-Type': 'application/json'
+      };
     }
+    
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
   }
   
   /**
    * Create a folder in Google Drive
    */
   async createFolder(name: string, parentId?: string): Promise<string> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     const metadata: any = {
       name: name,
@@ -73,13 +88,19 @@ class GoogleDriveService {
     }
     
     try {
-      const response = await gapi.client.drive.files.create({
-        resource: metadata,
-        fields: 'id, name'
+      const response = await fetch(`${this.DRIVE_API_BASE}/files`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(metadata)
       });
       
-      console.log(`Created folder: ${name} with ID: ${response.result.id}`);
-      return response.result.id!;
+      if (!response.ok) {
+        throw new Error(`Failed to create folder: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log(`Created folder: ${name} with ID: ${result.id}`);
+      return result.id;
     } catch (error) {
       console.error(`Error creating folder ${name}:`, error);
       throw error;
@@ -90,7 +111,7 @@ class GoogleDriveService {
    * Find a folder by name and optional parent
    */
   async findFolder(name: string, parentId?: string): Promise<string | null> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     let query = `name='${name}' and mimeType='${this.MIME_TYPE_FOLDER}' and trashed=false`;
     
@@ -99,14 +120,22 @@ class GoogleDriveService {
     }
     
     try {
-      const response = await gapi.client.drive.files.list({
-        q: query,
-        fields: 'files(id, name)',
-        pageSize: 10
-      });
+      const response = await fetch(
+        `${this.DRIVE_API_BASE}/files?` + new URLSearchParams({
+          q: query,
+          fields: 'files(id, name)',
+          pageSize: '10'
+        }),
+        { headers }
+      );
       
-      const files = response.result.files || [];
-      return files.length > 0 ? files[0].id! : null;
+      if (!response.ok) {
+        throw new Error(`Failed to search for folder: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      const files = result.files || [];
+      return files.length > 0 ? files[0].id : null;
     } catch (error) {
       console.error(`Error finding folder ${name}:`, error);
       return null;
@@ -161,11 +190,9 @@ class GoogleDriveService {
    * Save the data model to Google Drive
    */
   async saveDataModel(model: StandaloneDocumentGraph): Promise<void> {
-    await this.ensureDriveClient();
-    
+    const headers = await this.getAuthHeaders();
     const folderStructure = await this.ensureFolderStructure();
     const jsonContent = JSON.stringify(model, null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json' });
     
     // Check if file already exists
     const existingFileId = await this.findFile(
@@ -173,49 +200,81 @@ class GoogleDriveService {
       folderStructure.dataModelFolderId
     );
     
-    const metadata: any = {
-      name: this.DATA_MODEL_FILE,
-      mimeType: 'application/json'
-    };
-    
-    if (!existingFileId) {
-      metadata.parents = [folderStructure.dataModelFolderId];
-    }
-    
     try {
-      let response;
-      
       if (existingFileId) {
-        // Update existing file
-        response = await gapi.client.request({
-          path: `/upload/drive/v3/files/${existingFileId}`,
-          method: 'PATCH',
-          params: {
-            uploadType: 'multipart',
-            fields: 'id, name, modifiedTime'
-          },
-          headers: {
-            'Content-Type': 'multipart/related; boundary=foo_bar_baz'
-          },
-          body: await this.createMultipartBody(metadata, blob, 'foo_bar_baz')
-        });
+        // Update existing file using simple media upload with PATCH
+        const response = await fetch(
+          `${this.DRIVE_UPLOAD_API_BASE}/files/${existingFileId}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': headers['Authorization'] as string,
+              'Content-Type': 'application/json'
+            },
+            body: jsonContent
+          }
+        );
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Drive API error (update):', errorText);
+          throw new Error(`Failed to update data model: ${response.statusText} - ${errorText}`);
+        }
+        
+        console.log('Data model updated successfully');
       } else {
-        // Create new file
-        response = await gapi.client.request({
-          path: '/upload/drive/v3/files',
-          method: 'POST',
-          params: {
-            uploadType: 'multipart',
-            fields: 'id, name, modifiedTime'
-          },
-          headers: {
-            'Content-Type': 'multipart/related; boundary=foo_bar_baz'
-          },
-          body: await this.createMultipartBody(metadata, blob, 'foo_bar_baz')
-        });
+        // Create new file using two-step approach to avoid multipart issues
+        
+        // Step 1: Create empty file with metadata only
+        const metadata = {
+          name: this.DATA_MODEL_FILE,
+          mimeType: 'application/json',
+          parents: [folderStructure.dataModelFolderId]
+        };
+        
+        const createResponse = await fetch(
+          `${this.DRIVE_API_BASE}/files`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(metadata)
+          }
+        );
+        
+        if (!createResponse.ok) {
+          const errorText = await createResponse.text();
+          console.error('Drive API error (create metadata):', errorText);
+          throw new Error(`Failed to create data model file: ${createResponse.statusText} - ${errorText}`);
+        }
+        
+        const fileData = await createResponse.json();
+        const fileId = fileData.id;
+        console.log('Created empty file with ID:', fileId);
+        
+        // Step 2: Update the file with content using PATCH
+        const updateResponse = await fetch(
+          `${this.DRIVE_UPLOAD_API_BASE}/files/${fileId}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': headers['Authorization'] as string,
+              'Content-Type': 'application/json'
+            },
+            body: jsonContent
+          }
+        );
+        
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          console.error('Drive API error (update content):', errorText);
+          throw new Error(`Failed to update data model content: ${updateResponse.statusText} - ${errorText}`);
+        }
+        
+        // Log the response to verify the update
+        const updateResult = await updateResponse.json();
+        console.log('Update response:', updateResult);
+        console.log('Data model created and content added successfully');
       }
-      
-      console.log('Data model saved successfully:', response.result);
     } catch (error) {
       console.error('Error saving data model:', error);
       throw error;
@@ -226,8 +285,7 @@ class GoogleDriveService {
    * Load the data model from Google Drive
    */
   async loadDataModel(): Promise<StandaloneDocumentGraph | null> {
-    await this.ensureDriveClient();
-    
+    const headers = await this.getAuthHeaders();
     const folderStructure = await this.ensureFolderStructure();
     const fileId = await this.findFile(
       this.DATA_MODEL_FILE, 
@@ -240,24 +298,27 @@ class GoogleDriveService {
     }
     
     try {
-      const response = await gapi.client.drive.files.get({
-        fileId: fileId,
-        alt: 'media'
+      const response = await fetch(`${this.DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': headers['Authorization'] as string
+        }
       });
       
-      // The response.result contains the file content when using alt: 'media'
-      // It could be a string or already parsed JSON
-      let model: StandaloneDocumentGraph;
-      
-      if (typeof response.result === 'string') {
-        model = JSON.parse(response.result);
-      } else if (response.result && typeof response.result === 'object') {
-        // If it's already an object, assume it's the parsed JSON
-        model = response.result as unknown as StandaloneDocumentGraph;
-      } else {
-        throw new Error('Unexpected response format from Google Drive');
+      if (!response.ok) {
+        throw new Error(`Failed to load data model: ${response.statusText}`);
       }
       
+      // First check if we have content
+      const text = await response.text();
+      console.log('Loaded file content length:', text.length);
+      
+      if (!text || text.length === 0) {
+        console.error('File is empty!');
+        return null;
+      }
+      
+      // Parse the JSON content
+      const model = JSON.parse(text);
       console.log('Data model loaded successfully');
       return model;
     } catch (error) {
@@ -270,19 +331,27 @@ class GoogleDriveService {
    * Find a file by name in a specific folder
    */
   private async findFile(name: string, parentId: string): Promise<string | null> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     const query = `name='${name}' and '${parentId}' in parents and trashed=false`;
     
     try {
-      const response = await gapi.client.drive.files.list({
-        q: query,
-        fields: 'files(id, name)',
-        pageSize: 1
-      });
+      const response = await fetch(
+        `${this.DRIVE_API_BASE}/files?` + new URLSearchParams({
+          q: query,
+          fields: 'files(id, name)',
+          pageSize: '1'
+        }),
+        { headers }
+      );
       
-      const files = response.result.files || [];
-      return files.length > 0 ? files[0].id! : null;
+      if (!response.ok) {
+        throw new Error(`Failed to search for file: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      const files = result.files || [];
+      return files.length > 0 ? files[0].id : null;
     } catch (error) {
       console.error(`Error finding file ${name}:`, error);
       return null;
@@ -297,30 +366,54 @@ class GoogleDriveService {
     parentFolderId: string, 
     metadata?: Partial<DriveFile>
   ): Promise<DriveFile> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
-    const fileMetadata: any = {
+    const fileMetadata = {
       name: metadata?.name || file.name,
-      parents: [parentFolderId],
-      mimeType: file.type
+      parents: [parentFolderId]
     };
     
     try {
-      const response = await gapi.client.request({
-        path: '/upload/drive/v3/files',
-        method: 'POST',
-        params: {
-          uploadType: 'multipart',
-          fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink'
-        },
-        headers: {
-          'Content-Type': 'multipart/related; boundary=foo_bar_baz'
-        },
-        body: await this.createMultipartBody(fileMetadata, file, 'foo_bar_baz')
+      // Use resumable upload for larger files
+      const boundary = '314159265358979323846';
+      const delimiter = "--" + boundary + "\r\n";
+      const closeDelimiter = "\r\n--" + boundary + "--";
+      
+      const reader = new FileReader();
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
       
-      console.log('File uploaded successfully:', response.result);
-      return response.result as DriveFile;
+      const base64Data = fileContent.split(',')[1];
+      
+      const multipartBody = 
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(fileMetadata) +
+        "\r\n" + delimiter +
+        'Content-Type: ' + file.type + '\r\n' +
+        'Content-Transfer-Encoding: base64\r\n\r\n' +
+        base64Data +
+        closeDelimiter;
+      
+      const response = await fetch(`${this.DRIVE_API_BASE}/files?uploadType=multipart`, {
+        method: 'POST',
+        headers: {
+          'Authorization': headers['Authorization'] as string,
+          'Content-Type': 'multipart/related; boundary=' + boundary
+        },
+        body: multipartBody
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to upload file: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('File uploaded successfully:', result);
+      return result as DriveFile;
     } catch (error) {
       console.error('Error uploading file:', error);
       throw error;
@@ -331,21 +424,20 @@ class GoogleDriveService {
    * Download a file from Google Drive
    */
   async downloadFile(fileId: string): Promise<Blob> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     try {
-      const response = await gapi.client.drive.files.get({
-        fileId: fileId,
-        alt: 'media'
+      const response = await fetch(`${this.DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+        headers: {
+          'Authorization': headers['Authorization'] as string
+        }
       });
       
-      // Convert response to Blob
-      const contentType = response.headers?.['Content-Type'] || 'application/octet-stream';
-      const blob = new Blob([response.body], { 
-        type: contentType
-      });
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
       
-      return blob;
+      return await response.blob();
     } catch (error) {
       console.error('Error downloading file:', error);
       throw error;
@@ -356,19 +448,27 @@ class GoogleDriveService {
    * List files in a folder
    */
   async listFiles(folderId: string): Promise<DriveFile[]> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     const query = `'${folderId}' in parents and trashed=false`;
     
     try {
-      const response = await gapi.client.drive.files.list({
-        q: query,
-        fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink)',
-        pageSize: 1000,
-        orderBy: 'name'
-      });
+      const response = await fetch(
+        `${this.DRIVE_API_BASE}/files?` + new URLSearchParams({
+          q: query,
+          fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink)',
+          pageSize: '1000',
+          orderBy: 'name'
+        }),
+        { headers }
+      );
       
-      return (response.result.files || []) as DriveFile[];
+      if (!response.ok) {
+        throw new Error(`Failed to list files: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      return (result.files || []) as DriveFile[];
     } catch (error) {
       console.error('Error listing files:', error);
       return [];
@@ -379,12 +479,18 @@ class GoogleDriveService {
    * Delete a file or folder
    */
   async deleteFile(fileId: string): Promise<void> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     try {
-      await gapi.client.drive.files.delete({
-        fileId: fileId
+      const response = await fetch(`${this.DRIVE_API_BASE}/files/${fileId}`, {
+        method: 'DELETE',
+        headers
       });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete file: ${response.statusText}`);
+      }
+      
       console.log(`Deleted file/folder: ${fileId}`);
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -396,15 +502,21 @@ class GoogleDriveService {
    * Get file metadata
    */
   async getFileMetadata(fileId: string): Promise<DriveFile> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     try {
-      const response = await gapi.client.drive.files.get({
-        fileId: fileId,
-        fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, parents'
-      });
+      const response = await fetch(
+        `${this.DRIVE_API_BASE}/files/${fileId}?` + new URLSearchParams({
+          fields: 'id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink, parents'
+        }),
+        { headers }
+      );
       
-      return response.result as DriveFile;
+      if (!response.ok) {
+        throw new Error(`Failed to get file metadata: ${response.statusText}`);
+      }
+      
+      return await response.json() as DriveFile;
     } catch (error) {
       console.error('Error getting file metadata:', error);
       throw error;
@@ -412,58 +524,29 @@ class GoogleDriveService {
   }
   
   /**
-   * Create multipart body for file upload
-   */
-  private async createMultipartBody(
-    metadata: any, 
-    file: Blob, 
-    boundary: string
-  ): Promise<string> {
-    const delimiter = '\r\n--' + boundary + '\r\n';
-    const closeDelimiter = '\r\n--' + boundary + '--';
-    
-    // Convert blob to base64
-    const base64 = await this.blobToBase64(file);
-    const base64Data = base64.split(',')[1]; // Remove data URL prefix
-    
-    return delimiter +
-      'Content-Type: application/json\r\n\r\n' +
-      JSON.stringify(metadata) +
-      delimiter +
-      'Content-Type: ' + file.type + '\r\n' +
-      'Content-Transfer-Encoding: base64\r\n\r\n' +
-      base64Data +
-      closeDelimiter;
-  }
-  
-  /**
-   * Convert blob to base64 string
-   */
-  private blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-  
-  /**
    * Search for files across all folders
    */
   async searchFiles(query: string): Promise<DriveFile[]> {
-    await this.ensureDriveClient();
+    const headers = await this.getAuthHeaders();
     
     const driveQuery = `fullText contains '${query}' and trashed=false`;
     
     try {
-      const response = await gapi.client.drive.files.list({
-        q: driveQuery,
-        fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink)',
-        pageSize: 100
-      });
+      const response = await fetch(
+        `${this.DRIVE_API_BASE}/files?` + new URLSearchParams({
+          q: driveQuery,
+          fields: 'files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, webContentLink)',
+          pageSize: '100'
+        }),
+        { headers }
+      );
       
-      return (response.result.files || []) as DriveFile[];
+      if (!response.ok) {
+        throw new Error(`Failed to search files: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      return (result.files || []) as DriveFile[];
     } catch (error) {
       console.error('Error searching files:', error);
       return [];

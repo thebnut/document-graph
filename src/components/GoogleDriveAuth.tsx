@@ -18,9 +18,9 @@ export const GoogleDriveAuth: React.FC<GoogleDriveAuthProps> = ({
 }) => {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
-    user: null,
     accessToken: null,
-    error: null
+    error: null,
+    userEmail: null
   });
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(false);
@@ -114,9 +114,9 @@ export const GoogleDriveAuth: React.FC<GoogleDriveAuthProps> = ({
       <div className="flex items-center space-x-2 text-sm">
         <span className="text-green-600">●</span>
         <span>Connected to Google Drive</span>
-        {authState.user && (
+        {authState.userEmail && (
           <span className="text-gray-500">
-            ({authState.user.getBasicProfile().getEmail()})
+            ({authState.userEmail})
           </span>
         )}
         <button

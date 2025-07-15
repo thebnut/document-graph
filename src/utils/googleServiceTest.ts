@@ -26,8 +26,17 @@ export const testGoogleServices = {
       
       if (!isAuth) {
         console.log('🔄 Starting sign-in flow...');
-        const user = await googleAuthService.signIn();
-        console.log('✅ Sign-in successful:', user.getBasicProfile().getEmail());
+        await googleAuthService.signIn();
+        console.log('✅ Sign-in successful');
+        
+        // Get auth state after sign in
+        const authState = googleAuthService.getAuthState();
+        if (authState.userEmail) {
+          console.log(`✅ Signed in as: ${authState.userEmail}`);
+        }
+      } else {
+        const authState = googleAuthService.getAuthState();
+        console.log(`✅ Already signed in as: ${authState.userEmail || 'unknown'}`);
       }
       
       // Get access token
@@ -75,9 +84,11 @@ export const testGoogleServices = {
     try {
       // Create test data
       const currentTime = new Date().toISOString();
-      const testModel: StandaloneDocumentGraph = {
-        id: 'test-graph-' + Date.now(),
-        version: '2.0.0',
+      const testModel: any = {  // Using 'any' temporarily to test without conflicting fields
+        // Removing id and version fields that conflict with Google Drive's File resource
+        // id: 'test-graph-' + Date.now(),
+        // version: '2.0.0',
+        graphId: 'test-graph-' + Date.now(),  // Use different field name
         schema: 'https://lifemap.app/schemas/document-graph/v2.0.0',
         metadata: {
           title: 'Test Document Graph',
@@ -86,7 +97,8 @@ export const testGoogleServices = {
           modified: currentTime,
           createdBy: 'test-user@example.com',
           modifiedBy: 'test-user@example.com',
-          tenant: 'test-family'
+          tenant: 'test-family',
+          version: '2.0.0'  // Move version here to avoid Google Drive conflict
         },
         entities: [{
           id: 'test-1',
@@ -158,6 +170,26 @@ export const testGoogleServices = {
     console.log(`Data Model: ${results.dataModel ? '✅ PASSED' : '❌ FAILED'}`);
     
     return results;
+  },
+  
+  /**
+   * Test sign out
+   */
+  async testSignOut() {
+    console.log('👋 Testing Sign Out...');
+    
+    try {
+      await googleAuthService.signOut();
+      console.log('✅ Signed out successfully');
+      
+      const isAuth = googleAuthService.isAuthenticated();
+      console.log(`Authentication status after sign out: ${isAuth ? '❌ Still authenticated' : '✅ Not authenticated'}`);
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Sign out test failed:', error);
+      return false;
+    }
   }
 };
 

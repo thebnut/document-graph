@@ -17,6 +17,9 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import './utils/googleServiceTest'; // Import test utilities for browser console
+import './utils/googleAuthDebug'; // Import debug utilities for browser console
+import './utils/googleDriveCleanup'; // Import cleanup utilities for browser console
 import { 
   Upload, 
   Search, 
