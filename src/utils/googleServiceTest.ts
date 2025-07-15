@@ -84,11 +84,9 @@ export const testGoogleServices = {
     try {
       // Create test data
       const currentTime = new Date().toISOString();
-      const testModel: any = {  // Using 'any' temporarily to test without conflicting fields
-        // Removing id and version fields that conflict with Google Drive's File resource
-        // id: 'test-graph-' + Date.now(),
-        // version: '2.0.0',
-        graphId: 'test-graph-' + Date.now(),  // Use different field name
+      const testModel: StandaloneDocumentGraph = {
+        id: 'test-graph-' + Date.now(),
+        version: '2.0.0',
         schema: 'https://lifemap.app/schemas/document-graph/v2.0.0',
         metadata: {
           title: 'Test Document Graph',
@@ -97,8 +95,7 @@ export const testGoogleServices = {
           modified: currentTime,
           createdBy: 'test-user@example.com',
           modifiedBy: 'test-user@example.com',
-          tenant: 'test-family',
-          version: '2.0.0'  // Move version here to avoid Google Drive conflict
+          tenant: 'test-family'
         },
         entities: [{
           id: 'test-1',

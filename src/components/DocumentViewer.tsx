@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCw, Download, Loader } from 'lucide-react';
 import { useDocumentViewer } from '../contexts/DocumentViewerContext';
+import { googleDriveService } from '../services/googleDriveService';
+import { googleAuthService } from '../services/googleAuthService';
 
 interface DocumentViewerProps {
   darkMode: boolean;
 }
 
 // Custom hook for fetching documents as blobs
-const useDocumentBlob = (documentPath: string | undefined, isOpen: boolean) => {
+const useDocumentBlob = (documentPath: string | undefined, isOpen: boolean, entity: any) => {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,15 +25,42 @@ const useDocumentBlob = (documentPath: string | undefined, isOpen: boolean) => {
       setError(null);
       
       try {
-        // For now, we'll use the direct path, but this is where we'd add authentication
-        // In the future: const response = await fetch(documentPath, { headers: { Authorization: `Bearer ${token}` } });
-        const response = await fetch(documentPath);
+        let blob: Blob;
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch document: ${response.statusText}`);
+        // Check if this is a Google Drive document
+        if (documentPath.startsWith('google-drive://')) {
+          // Extract file ID from google-drive://fileId format
+          const fileId = documentPath.replace('google-drive://', '');
+          
+          // Check authentication
+          if (!googleAuthService.isAuthenticated()) {
+            throw new Error('Google Drive authentication required');
+          }
+          
+          // Download from Google Drive
+          blob = await googleDriveService.downloadFile(fileId);
+        } else if (entity?.documents?.[0]?.googleDriveMetadata?.fileId) {
+          // Alternative: check if entity has Google Drive metadata
+          const fileId = entity.documents[0].googleDriveMetadata.fileId;
+          
+          // Check authentication
+          if (!googleAuthService.isAuthenticated()) {
+            throw new Error('Google Drive authentication required');
+          }
+          
+          // Download from Google Drive
+          blob = await googleDriveService.downloadFile(fileId);
+        } else {
+          // Regular HTTP fetch for local files
+          const response = await fetch(documentPath);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.statusText}`);
+          }
+          
+          blob = await response.blob();
         }
         
-        const blob = await response.blob();
         if (!cancelled) {
           const url = URL.createObjectURL(blob);
           setBlobUrl(url);
@@ -52,7 +81,7 @@ const useDocumentBlob = (documentPath: string | undefined, isOpen: boolean) => {
     return () => {
       cancelled = true;
     };
-  }, [documentPath, isOpen]);
+  }, [documentPath, isOpen, entity]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -76,7 +105,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const imageContainerRef = useRef<HTMLDivElement>(null);
   
   // Fetch document as blob
-  const { blobUrl, loading: documentLoading, error: documentError } = useDocumentBlob(entity?.documentPath, isOpen);
+  const { blobUrl, loading: documentLoading, error: documentError } = useDocumentBlob(entity?.documentPath, isOpen, entity);
 
   // Reset state when entity changes
   useEffect(() => {

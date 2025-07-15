@@ -88,7 +88,7 @@ export class StandaloneToReactFlowAdapter {
  * Enhanced data service using standalone model
  */
 export class StandaloneDataService {
-  private model: DocumentGraphModel;
+  protected model: DocumentGraphModel;
   private useExpandedData: boolean;
   private migrationTool: DataMigration;
   

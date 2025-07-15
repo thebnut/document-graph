@@ -323,3 +323,106 @@ See `GOOGLE-DRIVE-IMPLEMENTATION-PLAN.md` for detailed implementation steps:
 **Next Steps**: 
 - Phase 3-4: Integrate auth component into App.tsx
 - See `docs/google-drive-integration-next-steps.md` for integration guide
+
+### Google Drive API Integration Learnings
+
+When working with Google Drive API, these critical lessons were learned through extensive debugging:
+
+#### 1. **Use Different Endpoints for Different Operations**
+- **Upload endpoint** (`https://www.googleapis.com/upload/drive/v3`): Use ONLY for uploading content with `uploadType=media`
+- **Regular endpoint** (`https://www.googleapis.com/drive/v3`): Use for everything else including:
+  - Creating file metadata (POST without uploadType)
+  - Downloading files (GET with alt=media)
+  - All other metadata operations
+
+#### 2. **Avoid Multipart Upload for JSON Content**
+- Google Drive API unexpectedly parses JSON content even with `uploadType=media`
+- This causes "Invalid JSON payload" errors if your JSON contains fields that conflict with Drive's File resource schema (e.g., `version`, `id`)
+- Solution: Use two-step approach: create metadata first, then update content
+
+#### 3. **Two-Step File Creation Pattern**
+```typescript
+// Step 1: Create empty file with metadata
+const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name, mimeType, parents })
+});
+
+// Step 2: Update content with PATCH
+const updateResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+  method: 'PATCH',
+  headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: jsonContent
+});
+```
+
+#### 4. **Common Pitfalls**
+- ❌ Don't use FormData for JSON uploads - it creates wrong Content-Type
+- ❌ Don't use PUT for content updates - use PATCH
+- ❌ Don't manually construct multipart bodies - they're error-prone
+- ❌ Don't use base64 encoding - it adds complexity without solving the core issues
+
+#### 5. **Authentication with Google Identity Services**
+- The new library uses token-based auth, not session-based
+- Tokens must be manually refreshed before expiry
+- Store tokens in localStorage for persistence
+- Always check token expiry before API calls
+
+### Phase 4 & 5 Implementation Learnings
+
+When implementing authentication flow and data synchronization with Google Drive:
+
+#### 1. **Architecture Pattern: AuthProvider + AuthGate**
+- Use React Context (AuthProvider) for global auth state management
+- AuthGate component acts as a guard that blocks app access until authenticated
+- This pattern cleanly separates auth concerns from business logic
+- Place AuthProvider high in component tree but inside ErrorBoundary
+
+#### 2. **Data Service Architecture**
+- Create a service that extends the base data service for Drive-specific operations
+- Use dependency injection pattern: check auth status to decide which service to instantiate
+- Keep the adapter pattern to maintain backward compatibility with existing UI code
+- Make the base service's `model` property `protected` (not private) to allow extension
+
+#### 3. **Auto-Save Implementation**
+- Debounce saves to avoid excessive API calls (30 seconds works well)
+- Track actual changes by comparing serialized data to avoid unnecessary saves
+- Override data mutation methods (addEntity, updateEntity, etc.) to trigger auto-save
+- Save UI state changes (node positions, expansion state) separately from data changes
+
+#### 4. **Sync Status Management**
+- Create a dedicated sync status type with clear states (syncing, synced, error, pending)
+- Use observer pattern for sync status updates
+- Show sync status in UI but keep it non-intrusive
+- Provide manual sync option for user control
+
+#### 5. **Data Migration Strategy**
+- Check for existing Drive data first, migrate sample data only if empty
+- Use async migration but handle synchronously for initial load (improve with progress UI later)
+- Cache migrated data locally immediately
+- Keep migration tool separate from service for reusability
+
+#### 6. **TypeScript Gotchas**
+- DocumentGraphModel's internal structure needs careful handling
+- Use `toJSON()` and `JSON.parse()` to get proper StandaloneDocumentGraph type
+- Be careful with property access - use proper methods instead of direct property access
+- Type guards help when dealing with service polymorphism
+
+#### 7. **Local Caching Strategy**
+- Cache both data and metadata (lastModified, lastSyncTime)
+- Load from cache first for fast startup, then sync in background
+- Handle cache failures gracefully - don't block app startup
+- Clear cache on sign out for security
+
+#### 8. **Error Handling Best Practices**
+- Don't fail auth if folder creation fails - user can work offline
+- Show sync errors in UI but don't block user actions
+- Implement retry logic for transient failures
+- Log errors for debugging but keep user messages simple
+
+#### 9. **Component Integration**
+- Add auth/sync features incrementally to existing components
+- Use existing component callbacks (onNodeDragStop, etc.) to trigger saves
+- Keep sync logic in services, not components
+- Make components sync-agnostic where possible

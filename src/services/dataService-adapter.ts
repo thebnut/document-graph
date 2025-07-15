@@ -5,18 +5,32 @@
 
 import { Node, Edge } from 'reactflow';
 import { StandaloneDataService, NodeData } from './standaloneDataService';
+import { GoogleDriveDataService } from './googleDriveDataService';
+import { googleAuthService } from './googleAuthService';
 import { Entity } from '../data/model';
 
 /**
  * Drop-in replacement for the old DataService class
- * Uses StandaloneDataService internally but maintains the same API
+ * Uses GoogleDriveDataService when authenticated, StandaloneDataService otherwise
  */
 export class DataService {
-  private standaloneService: StandaloneDataService;
+  private standaloneService: StandaloneDataService | GoogleDriveDataService;
+  private service: StandaloneDataService | GoogleDriveDataService; // Alias for compatibility
   
   constructor(model?: any, useExpandedData: boolean = true) {
-    // If model is provided, it's likely the old format - ignore for now
-    this.standaloneService = new StandaloneDataService(undefined, useExpandedData);
+    // Use GoogleDriveDataService if authenticated
+    if (googleAuthService.isAuthenticated()) {
+      this.standaloneService = GoogleDriveDataService.getInstance();
+      this.service = this.standaloneService; // Set alias
+      // Initialize it asynchronously
+      (this.standaloneService as GoogleDriveDataService).initialize().catch(error => {
+        console.error('Failed to initialize Google Drive data service:', error);
+      });
+    } else {
+      // Fall back to local sample data
+      this.standaloneService = new StandaloneDataService(undefined, useExpandedData);
+      this.service = this.standaloneService; // Set alias
+    }
   }
   
   /**
@@ -201,6 +215,59 @@ export class DataService {
     if (mimeType.startsWith('image/')) return 'image';
     if (mimeType === 'application/pdf') return 'pdf';
     return 'other';
+  }
+  
+  /**
+   * Check if using Google Drive service
+   */
+  isUsingGoogleDrive(): boolean {
+    return this.service instanceof GoogleDriveDataService;
+  }
+  
+  /**
+   * Get Google Drive service if available
+   */
+  getGoogleDriveService(): GoogleDriveDataService | null {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      return this.standaloneService;
+    }
+    return null;
+  }
+  
+  /**
+   * Save changes (only works with Google Drive)
+   */
+  async saveChanges(): Promise<void> {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      await this.standaloneService.saveChanges();
+    }
+  }
+  
+  /**
+   * Update UI hints for an entity (triggers auto-save if using Google Drive)
+   */
+  updateUIHints(entityId: string, hints: any): void {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      this.standaloneService.updateUIHints(entityId, hints);
+    }
+  }
+  
+  /**
+   * Upload a document to Google Drive (if available)
+   */
+  async uploadDocument(
+    file: File,
+    entity: any
+  ): Promise<{
+    fileId: string;
+    webViewLink: string;
+    webContentLink: string;
+    personFolder: string;
+  } | null> {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      return await this.standaloneService.uploadDocument(file, entity);
+    }
+    return null;
   }
 }
 

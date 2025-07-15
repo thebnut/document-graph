@@ -56,7 +56,10 @@ import {
 } from 'lucide-react';
 import { dataService, NodeData } from './services/dataService-adapter';
 import { useDocumentViewer, DocumentViewerProvider } from './contexts/DocumentViewerContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthGate } from './components/AuthGate';
 import { DocumentViewer } from './components/DocumentViewer';
+import { SyncStatusIndicator } from './components/SyncStatusIndicator';
 import { D3RadialLayoutEngine } from './services/d3RadialLayoutEngine';
 
 // Comprehensive ResizeObserver error suppression
@@ -441,6 +444,14 @@ function DocumentGraphInner() {
         ? { ...n, data: { ...n.data, isManuallyPositioned: true } }
         : n
     ));
+    
+    // Save position to Google Drive if available
+    if (dataService.isUsingGoogleDrive()) {
+      dataService.updateUIHints(node.id, {
+        position: node.position,
+        isManuallyPositioned: true
+      });
+    }
   }, []);
   
   // Handle node click to expand/collapse
@@ -492,6 +503,14 @@ function DocumentGraphInner() {
             });
           }, 100);
         }
+        
+        // Save expansion state to Google Drive if available
+        if (dataService.isUsingGoogleDrive()) {
+          dataService.updateUIHints(node.id, {
+            expanded: !newSet.has(node.id)
+          });
+        }
+        
         return newSet;
       });
     }
@@ -630,22 +649,96 @@ function DocumentGraphInner() {
     setShowAddModal(false);
   };
   
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Create initial node data
+      const tempId = `doc-${Date.now()}`;
       const documentNode: Node = {
-        id: `doc-${Date.now()}`,
+        id: tempId,
         type: 'entity',
         position: { x: Math.random() * 500, y: Math.random() * 500 },
         data: {
           label: file.name,
           type: 'document',
-          description: `Uploaded document: ${file.name}`,
+          description: `Uploading: ${file.name}...`,
           source: 'Manual upload',
         },
       };
+      
+      // Add node immediately to show upload progress
       setNodes((nds) => [...nds, documentNode]);
       setAllNodesData((nds) => [...nds, documentNode]);
+      
+      try {
+        // Upload to Google Drive if available
+        if (dataService.isUsingGoogleDrive()) {
+          const uploadResult = await dataService.uploadDocument(file, documentNode.data);
+          
+          if (uploadResult) {
+            // Update node with Google Drive information
+            const updatedNode: Node = {
+              ...documentNode,
+              data: {
+                ...documentNode.data,
+                description: `Uploaded to ${uploadResult.personFolder} folder`,
+                documentPath: uploadResult.webContentLink,
+                source: uploadResult.webViewLink,
+                documents: [{
+                  id: uploadResult.fileId,
+                  type: 'google-drive',
+                  location: `google-drive://${uploadResult.fileId}`,
+                  mimeType: file.type,
+                  fileName: file.name,
+                  provider: 'google-drive',
+                  requiresAuth: true,
+                  uploadedAt: new Date().toISOString(),
+                  uploadedBy: 'current-user',
+                  googleDriveMetadata: {
+                    fileId: uploadResult.fileId,
+                    driveAccount: 'current-user',
+                    shared: false,
+                    personFolder: uploadResult.personFolder,
+                    webViewLink: uploadResult.webViewLink,
+                    webContentLink: uploadResult.webContentLink
+                  }
+                }]
+              },
+            };
+            
+            // Update the node
+            setNodes((nds) => nds.map(n => n.id === tempId ? updatedNode : n));
+            setAllNodesData((nds) => nds.map(n => n.id === tempId ? updatedNode : n));
+            
+            console.log('Document uploaded successfully:', uploadResult);
+          }
+        } else {
+          // No Google Drive - just update description
+          setNodes((nds) => nds.map(n => 
+            n.id === tempId 
+              ? { ...n, data: { ...n.data, description: `Local document: ${file.name}` } }
+              : n
+          ));
+          setAllNodesData((nds) => nds.map(n => 
+            n.id === tempId 
+              ? { ...n, data: { ...n.data, description: `Local document: ${file.name}` } }
+              : n
+          ));
+        }
+      } catch (error) {
+        console.error('Failed to upload document:', error);
+        // Update node to show error
+        setNodes((nds) => nds.map(n => 
+          n.id === tempId 
+            ? { ...n, data: { ...n.data, description: `Upload failed: ${file.name}` } }
+            : n
+        ));
+        setAllNodesData((nds) => nds.map(n => 
+          n.id === tempId 
+            ? { ...n, data: { ...n.data, description: `Upload failed: ${file.name}` } }
+            : n
+        ));
+      }
     }
   };
   
@@ -863,6 +956,11 @@ useEffect(() => {
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
           </Panel>
+          
+          {/* Sync Status Indicator */}
+          <Panel position="top-right">
+            <SyncStatusIndicator />
+          </Panel>
         </ReactFlow>
         
         {/* Add Node Modal */}
@@ -1029,7 +1127,11 @@ function DocumentGraphApp() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <DocumentGraphApp />
+      <AuthProvider>
+        <AuthGate requireAuth={true}>
+          <DocumentGraphApp />
+        </AuthGate>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
