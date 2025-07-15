@@ -26,6 +26,13 @@ npm test
 ```
 Launches the test runner in interactive watch mode
 
+### Environment Variables
+Create a `.env` file in the project root with:
+```bash
+REACT_APP_GOOGLE_CLIENT_ID=your-client-id-here
+REACT_APP_GOOGLE_API_KEY=your-api-key-here
+```
+
 ## Architecture Overview
 
 ### Core Technologies
@@ -304,25 +311,46 @@ The app automatically migrates from the old format to the new standalone model:
 3. Documents are prepared for Google Drive (with placeholder IDs)
 4. The UI continues working through the adapter layer
 
-### Google Drive Integration (Phase 1-2 Complete ✅)
+### Google Drive Integration (Phases 1-6 Complete ✅)
 See `GOOGLE-DRIVE-IMPLEMENTATION-PLAN.md` for detailed implementation steps:
 - ✅ **Phase 1**: API setup complete (packages installed, .env configured)
 - ✅ **Phase 2**: Authentication services implemented
   - `googleAuthService.ts` - OAuth2 flow and token management
   - `googleDriveService.ts` - Drive API operations (folders, files, sync)
-  - `GoogleDriveAuth.tsx` - React authentication component
-  - `googleServiceTest.ts` - Browser console testing utilities
+- ✅ **Phase 3-4**: Authentication flow integrated
+  - `AuthContext.tsx` - Global auth state management
+  - `AuthGate.tsx` - Authentication guard component
+- ✅ **Phase 5**: Data synchronization implemented
+  - `googleDriveDataService.ts` - Auto-sync with 30-second debouncing
+  - `SyncStatusIndicator.tsx` - Visual sync status
+- ✅ **Phase 6**: Document organization implemented
+  - `documentOrganizerService.ts` - Person folder management
+  - Automatic folder creation for each person + Household
+  - Document upload/download integration
 
-**Current Status**:
-- OAuth2 authentication flow ready
-- Folder structure: `lifemap-data/data-model/` and `lifemap-data/documents/`
-- Person-based document organization implemented
-- Automatic sync of data model to Drive ready
-- Test in browser console: `testGoogleServices.runAll()`
+**Current Architecture**:
+```
+App.tsx
+└── AuthProvider (contexts/AuthContext.tsx)
+    └── AuthGate (components/AuthGate.tsx)
+        └── DocumentGraphApp
+            ├── Uses dataService-adapter.ts
+            ├── Which uses GoogleDriveDataService (when authenticated)
+            └── Document operations use documentOrganizerService
+```
 
-**Next Steps**: 
-- Phase 3-4: Integrate auth component into App.tsx
-- See `docs/google-drive-integration-next-steps.md` for integration guide
+**Key Files for Google Drive**:
+- `/src/services/googleAuthService.ts` - Authentication management
+- `/src/services/googleDriveService.ts` - Core Drive API operations
+- `/src/services/googleDriveDataService.ts` - Data sync service
+- `/src/services/documentOrganizerService.ts` - Document folder management
+- `/src/components/DocumentViewer.tsx` - Updated to download from Drive
+- `/src/App.tsx` - Updated handleFileUpload for Drive uploads
+
+**Testing**: 
+- Browser console: `testGoogleServices.runAll()`
+- Check auth: `googleAuthService.isAuthenticated()`
+- Manual sync: `dataService.saveChanges()`
 
 ### Google Drive API Integration Learnings
 
@@ -426,3 +454,103 @@ When implementing authentication flow and data synchronization with Google Drive
 - Use existing component callbacks (onNodeDragStop, etc.) to trigger saves
 - Keep sync logic in services, not components
 - Make components sync-agnostic where possible
+
+### Phase 6: Document Organization Implementation Learnings
+
+When implementing document organization with person-specific folders in Google Drive:
+
+#### 1. **Service Architecture for Folder Management**
+- Create dedicated service (DocumentOrganizerService) for folder operations
+- Cache folder IDs to avoid repeated API calls
+- Initialize folders once during app startup, not on every upload
+- Handle "Household" folder for shared documents gracefully
+
+#### 2. **Person Folder Mapping Strategy**
+- Extract person entities from data model during initialization
+- Walk up entity hierarchy to find document ownership
+- Default to "Household" for documents without clear ownership
+- Store person name with folder ID for efficient lookups
+
+#### 3. **Document Upload Flow**
+- Show upload progress immediately in UI (optimistic updates)
+- Upload file first, then update entity with Drive metadata
+- Include full Google Drive metadata in entity for future reference
+- Trigger auto-save after successful upload to persist changes
+
+#### 4. **Document Download Integration**
+- Check for `google-drive://` prefix in document paths
+- Fall back to checking entity.documents[0].googleDriveMetadata
+- Handle authentication errors gracefully
+- Use blob URLs for consistent viewer experience
+
+#### 5. **TypeScript Considerations**
+- Google Drive File interface is minimal - avoid adding custom fields
+- Use type guards when checking for Drive-specific properties
+- Entity types may need updates to support documents array
+- Service instanceof checks help with polymorphic behavior
+
+#### 6. **Error Handling Patterns**
+- Don't fail initialization if folder creation fails
+- Show upload errors in UI but don't block other operations
+- Provide fallback behavior for non-authenticated users
+- Log detailed errors for debugging while keeping user messages simple
+
+#### 7. **UI/UX Best Practices**
+- Update document description to show target folder
+- Display upload progress inline with document creation
+- Keep existing node creation flow, enhance with Drive features
+- Show sync status without interrupting user workflow
+
+#### 8. **Folder Structure**
+```
+Google Drive/
+└── lifemap-data/
+    ├── data-model/
+    │   └── document-graph.json
+    └── documents/
+        ├── Brett Thebault/
+        ├── Gemma Thebault/
+        ├── Freya Thebault/
+        ├── Anya Thebault/
+        └── Household/
+```
+
+#### 9. **Migration Considerations**
+- Sample data document paths need updating to Drive references
+- Create placeholder references during migration
+- Track documents needing manual upload
+- Consider bulk upload UI for existing documents
+
+### Critical Implementation Notes
+
+#### Authentication Required on App Load
+The app now requires Google Drive authentication before use. This is enforced by the AuthGate component wrapping the entire app. To disable this for development:
+- Change `<AuthGate requireAuth={true}>` to `requireAuth={false}` in App.tsx
+- Or remove AuthProvider/AuthGate wrappers temporarily
+
+#### Data Service Selection
+The dataService-adapter automatically selects the appropriate service:
+- Authenticated: Uses GoogleDriveDataService with auto-sync
+- Not authenticated: Falls back to StandaloneDataService with sample data
+
+#### Document Upload Behavior
+When uploading documents:
+1. File uploads immediately to Google Drive
+2. Node shows upload progress in description
+3. Document is placed in appropriate person folder
+4. Entity is updated with full Drive metadata
+5. Auto-save triggers to persist the change
+
+#### Folder Structure Initialization
+Person folders are created automatically on first authentication:
+- Happens during GoogleDriveDataService.initialize()
+- Creates folders for all person entities in the data model
+- Adds a "Household" folder for shared documents
+- Cached to avoid repeated API calls
+
+#### Document Path Formats
+The app supports multiple document path formats:
+- `google-drive://fileId` - New Drive reference format
+- `/documents/...` - Legacy local path format
+- `https://drive.google.com/...` - Direct Drive URLs
+- DocumentViewer handles all formats transparently
