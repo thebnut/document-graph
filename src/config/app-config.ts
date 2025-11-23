@@ -266,16 +266,20 @@ export class ConfigManager {
       config = this.deepMerge(config, envConfigs[env]);
     }
     
-    // Load from localStorage if available
-    if (typeof window !== 'undefined') {
-      const savedConfig = localStorage.getItem('lifemap-config');
-      if (savedConfig) {
-        try {
-          const parsed = JSON.parse(savedConfig);
-          config = this.deepMerge(config, parsed);
-        } catch (error) {
-          console.error('Failed to parse saved config:', error);
+    // Load from localStorage if available (only in browser, not during build)
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      try {
+        const savedConfig = window.localStorage.getItem('lifemap-config');
+        if (savedConfig) {
+          try {
+            const parsed = JSON.parse(savedConfig);
+            config = this.deepMerge(config, parsed);
+          } catch (error) {
+            console.error('Failed to parse saved config:', error);
+          }
         }
+      } catch (error) {
+        // localStorage not available (e.g., during webpack build)
       }
     }
     
@@ -286,8 +290,12 @@ export class ConfigManager {
   }
   
   private saveConfig(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lifemap-config', JSON.stringify(this.config));
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      try {
+        window.localStorage.setItem('lifemap-config', JSON.stringify(this.config));
+      } catch (error) {
+        // localStorage not available
+      }
     }
   }
   
@@ -335,26 +343,50 @@ export class ConfigManager {
   }
 }
 
-// Export singleton instance
-export const config = ConfigManager.getInstance().getConfig();
+// Lazy-loaded config getter (prevents localStorage access during webpack build)
+export function getConfig(): AppConfig {
+  // During webpack build (Node.js environment), return default config without localStorage access
+  if (typeof window === 'undefined') {
+    return defaultConfig;
+  }
+  return ConfigManager.getInstance().getConfig();
+}
+
+// Cached config instance (only loaded when first accessed in browser)
+let _configCache: AppConfig | undefined;
+
+// Legacy export for backwards compatibility (lazy evaluation)
+export const config = new Proxy({} as AppConfig, {
+  get(_target, prop) {
+    // Only load config when actually accessed, and only in browser context
+    if (!_configCache) {
+      if (typeof window === 'undefined') {
+        // During webpack build, return default config properties
+        return defaultConfig[prop as keyof AppConfig];
+      }
+      _configCache = getConfig();
+    }
+    return _configCache ? _configCache[prop as keyof AppConfig] : undefined;
+  }
+});
 
 // Helper functions
 export function getGoogleDriveConfig() {
-  return config.storage.googleDrive;
+  return getConfig().storage.googleDrive;
 }
 
 export function getAppDomain() {
-  return config.app.domain;
+  return getConfig().app.domain;
 }
 
 export function isProduction() {
-  return config.app.environment === 'production';
+  return getConfig().app.environment === 'production';
 }
 
 export function isDevelopment() {
-  return config.app.environment === 'development';
+  return getConfig().app.environment === 'development';
 }
 
 export function getApiUrl(endpoint: string) {
-  return `${config.api.baseUrl}${endpoint}`;
+  return `${getConfig().api.baseUrl}${endpoint}`;
 }

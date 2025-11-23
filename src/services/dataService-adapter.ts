@@ -167,6 +167,18 @@ export class DataService {
   }
   
   /**
+   * Delete an entity
+   */
+  deleteEntity(entityId: string): boolean {
+    try {
+      return this.standaloneService.deleteEntity(entityId);
+    } catch (error) {
+      console.error('Failed to delete entity:', error);
+      return false;
+    }
+  }
+  
+  /**
    * Get visible entities based on expansion state
    */
   getVisibleEntities(
@@ -268,6 +280,20 @@ export class DataService {
       return await this.standaloneService.uploadDocument(file, entity);
     }
     return null;
+  }
+  
+  /**
+   * Add a new entity to the model
+   */
+  addEntity(entity: Partial<any>): any {
+    return this.standaloneService.addEntity(entity);
+  }
+  
+  /**
+   * Update an existing entity
+   */
+  updateEntity(id: string, updates: Partial<any>): any {
+    return this.standaloneService.updateEntity(id, updates);
   }
 }
 

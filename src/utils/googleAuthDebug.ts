@@ -9,34 +9,40 @@ export const googleAuthDebug = {
    * Check current auth status
    */
   checkStatus() {
+    if (typeof window === 'undefined') return null;
+
     console.log('🔍 Checking Google Auth Status...');
-    
+
     // Check if authenticated
     const isAuth = googleAuthService.isAuthenticated();
     console.log(`Authenticated: ${isAuth ? '✅ YES' : '❌ NO'}`);
-    
+
     // Get auth state
     const authState = googleAuthService.getAuthState();
     console.log('Auth State:', authState);
-    
+
     // Check stored tokens
-    const stored = localStorage.getItem('lifemap-google-tokens');
-    if (stored) {
-      try {
-        const tokens = JSON.parse(stored);
-        console.log('Stored tokens:', {
-          hasToken: !!tokens.accessToken,
-          expiresAt: new Date(tokens.expiresAt).toLocaleString(),
-          expired: tokens.expiresAt < Date.now(),
-          userEmail: tokens.userEmail
-        });
-      } catch (e) {
-        console.error('Failed to parse stored tokens');
+    try {
+      const stored = window.localStorage.getItem('lifemap-google-tokens');
+      if (stored) {
+        try {
+          const tokens = JSON.parse(stored);
+          console.log('Stored tokens:', {
+            hasToken: !!tokens.accessToken,
+            expiresAt: new Date(tokens.expiresAt).toLocaleString(),
+            expired: tokens.expiresAt < Date.now(),
+            userEmail: tokens.userEmail
+          });
+        } catch (e) {
+          console.error('Failed to parse stored tokens');
+        }
+      } else {
+        console.log('No stored tokens found');
       }
-    } else {
-      console.log('No stored tokens found');
+    } catch (error) {
+      // localStorage not available
     }
-    
+
     return authState;
   },
   
@@ -44,9 +50,15 @@ export const googleAuthDebug = {
    * Clear all auth data
    */
   clearAuth() {
+    if (typeof window === 'undefined') return;
+
     console.log('🗑️ Clearing auth data...');
-    localStorage.removeItem('lifemap-google-tokens');
-    console.log('✅ Auth data cleared');
+    try {
+      window.localStorage.removeItem('lifemap-google-tokens');
+      console.log('✅ Auth data cleared');
+    } catch (error) {
+      // localStorage not available
+    }
   },
   
   /**

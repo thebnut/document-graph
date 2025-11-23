@@ -149,14 +149,16 @@ export class GoogleDriveDataService extends StandaloneDataService {
    * Cache data locally for offline access
    */
   private cacheDataLocally(data: StandaloneDocumentGraph): void {
+    if (typeof window === 'undefined') return; // Skip during webpack build
+
     try {
       const cache: LocalCache = {
         data,
         lastModified: new Date().toISOString(),
         lastSyncTime: new Date().toISOString()
       };
-      
-      localStorage.setItem('lifemap-data-cache', JSON.stringify(cache));
+
+      window.localStorage.setItem('lifemap-data-cache', JSON.stringify(cache));
       this.lastSavedData = JSON.stringify(data);
     } catch (error) {
       console.error('Failed to cache data locally:', error);
@@ -167,10 +169,12 @@ export class GoogleDriveDataService extends StandaloneDataService {
    * Load data from local cache
    */
   private loadFromLocalCache(): StandaloneDocumentGraph | null {
+    if (typeof window === 'undefined') return null; // Skip during webpack build
+
     try {
-      const cached = localStorage.getItem('lifemap-data-cache');
+      const cached = window.localStorage.getItem('lifemap-data-cache');
       if (!cached) return null;
-      
+
       const cache: LocalCache = JSON.parse(cached);
       return cache.data;
     } catch (error) {

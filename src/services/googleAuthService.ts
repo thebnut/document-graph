@@ -276,15 +276,21 @@ class GoogleAuthService {
    * Save tokens to localStorage
    */
   private saveTokens(): void {
-    if (this.currentToken && this.tokenExpiresAt) {
-      const tokens: StoredTokens = {
-        accessToken: this.currentToken,
-        expiresAt: this.tokenExpiresAt,
-        scope: getGoogleDriveConfig().scopes.join(' '),
-        userEmail: this.userEmail || undefined
-      };
-      
-      localStorage.setItem('lifemap-google-tokens', JSON.stringify(tokens));
+    if (typeof window === 'undefined') return; // Skip during webpack build
+
+    try {
+      if (this.currentToken && this.tokenExpiresAt) {
+        const tokens: StoredTokens = {
+          accessToken: this.currentToken,
+          expiresAt: this.tokenExpiresAt,
+          scope: getGoogleDriveConfig().scopes.join(' '),
+          userEmail: this.userEmail || undefined
+        };
+
+        window.localStorage.setItem('lifemap-google-tokens', JSON.stringify(tokens));
+      }
+    } catch (error) {
+      // localStorage not available
     }
   }
   
@@ -292,8 +298,10 @@ class GoogleAuthService {
    * Get stored tokens from localStorage
    */
   private getStoredTokens(): StoredTokens | null {
+    if (typeof window === 'undefined') return null; // Skip during webpack build
+
     try {
-      const stored = localStorage.getItem('lifemap-google-tokens');
+      const stored = window.localStorage.getItem('lifemap-google-tokens');
       if (!stored) {
         return null;
       }
@@ -308,7 +316,13 @@ class GoogleAuthService {
    * Clear stored tokens
    */
   private clearStoredTokens(): void {
-    localStorage.removeItem('lifemap-google-tokens');
+    if (typeof window === 'undefined') return; // Skip during webpack build
+
+    try {
+      window.localStorage.removeItem('lifemap-google-tokens');
+    } catch (error) {
+      // localStorage not available
+    }
   }
   
   /**

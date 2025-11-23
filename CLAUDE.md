@@ -31,6 +31,7 @@ Create a `.env` file in the project root with:
 ```bash
 REACT_APP_GOOGLE_CLIENT_ID=your-client-id-here
 REACT_APP_GOOGLE_API_KEY=your-api-key-here
+REACT_APP_OPENAI_API_KEY=your-openai-api-key-here  # Required for AI document analysis
 ```
 
 ## Architecture Overview
@@ -327,6 +328,11 @@ See `GOOGLE-DRIVE-IMPLEMENTATION-PLAN.md` for detailed implementation steps:
   - `documentOrganizerService.ts` - Person folder management
   - Automatic folder creation for each person + Household
   - Document upload/download integration
+- ✅ **Phase 7**: AI-powered document analysis implemented
+  - `documentAnalysisService.ts` - Multimodal LLM document analysis
+  - `documentPlacementService.ts` - AI-driven tree placement
+  - `BulkUploadModal.tsx` - Multi-document upload interface
+  - Flexible metadata extraction without predefined schema
 
 **Current Architecture**:
 ```
@@ -346,6 +352,13 @@ App.tsx
 - `/src/services/documentOrganizerService.ts` - Document folder management
 - `/src/components/DocumentViewer.tsx` - Updated to download from Drive
 - `/src/App.tsx` - Updated handleFileUpload for Drive uploads
+
+**Key Files for AI Document Analysis**:
+- `/src/config/ai-config.ts` - OpenAI configuration and settings
+- `/src/services/documentAnalysisService.ts` - Multimodal document analysis
+- `/src/services/documentPlacementService.ts` - AI placement decisions
+- `/src/components/BulkUploadModal.tsx` - Bulk upload UI with AI processing
+- `/src/utils/testAIServices.ts` - Browser console testing utilities
 
 **Testing**: 
 - Browser console: `testGoogleServices.runAll()`
@@ -554,3 +567,71 @@ The app supports multiple document path formats:
 - `/documents/...` - Legacy local path format
 - `https://drive.google.com/...` - Direct Drive URLs
 - DocumentViewer handles all formats transparently
+
+### Phase 7: AI Document Analysis Implementation
+
+#### Key Features
+1. **Multimodal LLM Analysis**
+   - Uses GPT-4 Vision to directly analyze images and PDFs
+   - No separate OCR step required
+   - Single API call for document understanding
+
+2. **Flexible Metadata Extraction**
+   - No predefined schema - LLM determines relevant fields
+   - Extracts nested, document-type-specific data structures
+   - Preserves all extracted information in entity metadata
+
+3. **Intelligent Placement**
+   - Second LLM call determines optimal tree location
+   - Considers document owner and category
+   - Provides confidence scores and reasoning
+
+4. **Bulk Upload Workflow**
+   - Drag-and-drop multiple documents
+   - Progress tracking for each document
+   - Batch creation of nodes after analysis
+
+#### AI Service Configuration
+```typescript
+// Environment variable required
+REACT_APP_OPENAI_API_KEY=your-key-here
+
+// Configuration in ai-config.ts
+{
+  model: 'gpt-4-turbo-preview',
+  visionModel: 'gpt-4-vision-preview',
+  maxTokens: 2000,
+  temperature: 0.2 // Low for consistency
+}
+```
+
+#### Testing AI Services
+```javascript
+// In browser console:
+testAIServices.isConfigured() // Check if configured
+testAIServices.analyzeFile(file) // Analyze a specific file
+testAIServices.testWithSampleImage() // Quick test
+```
+
+#### Example Extracted Data
+The LLM extracts different fields based on document type:
+```json
+// Passport
+{
+  "holder": { "fullName": "...", "dateOfBirth": "..." },
+  "document": { "number": "...", "expiryDate": "..." }
+}
+
+// Insurance
+{
+  "policyHolder": "...",
+  "vehicle": { "make": "...", "model": "..." },
+  "coverage": { "premium": 1850.00 }
+}
+```
+
+#### Integration with Graph
+- New nodes automatically placed based on AI suggestions
+- Full metadata stored on entities
+- Auto-save triggers after bulk upload
+- Graph refreshes to show new nodes
