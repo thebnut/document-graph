@@ -204,6 +204,7 @@ export interface StandaloneDocumentGraph {
     createdBy: string;
     modifiedBy: string;
     tenant: string;            // Family/organization ID
+    familyName?: string;       // Family name for filtering (e.g., "Thebault Family")
     locale?: string;           // en-US, etc.
   };
   

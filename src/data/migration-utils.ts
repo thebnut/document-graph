@@ -53,6 +53,7 @@ export class DataMigration {
         createdBy: 'migration-tool',
         modifiedBy: 'migration-tool',
         tenant: `family-${migrationId}`,
+        familyName: undefined, // Will be set during onboarding
         locale: 'en-US'
       },
       entities,

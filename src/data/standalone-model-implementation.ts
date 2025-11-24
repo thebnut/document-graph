@@ -38,6 +38,7 @@ export class DocumentGraphModel {
         createdBy: 'system',
         modifiedBy: 'system',
         tenant: '',
+        familyName: undefined, // Will be set during onboarding
         locale: 'en-US'
       },
       entities: [],
