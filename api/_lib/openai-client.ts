@@ -84,6 +84,14 @@ export function getDocumentAnalysisPrompt(): string {
 
 3. Extract ALL relevant information you can identify in the document. Be comprehensive and include any data that might be useful. Return as nested JSON structure appropriate to the document type.
 
+4. IMPORTANT: If this document belongs to or references specific people, extract their FULL NAMES as an array. Look for:
+   - Document holder/owner names
+   - Policy holder names
+   - Patient names
+   - Account holder names
+   - Beneficiary names
+   - Family member names
+
 Examples of what to extract:
 - For a passport: holder details (name, DOB, nationality), document details (number, issue/expiry dates), etc.
 - For insurance: policy holder, insurer details, policy info, coverage details, premiums, etc.
@@ -99,7 +107,8 @@ Return ONLY a raw JSON object with this exact structure. Do not include markdown
   "extractedData": {
     // Nested structure appropriate to document type
   },
-  "confidence": 0-100
+  "confidence": 0-100,
+  "personNames": ["Full Name 1", "Full Name 2"]  // NEW: Array of full names found in document
 }`;
 }
 

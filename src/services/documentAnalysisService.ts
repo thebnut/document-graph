@@ -15,6 +15,7 @@ export interface DocumentAnalysis {
   documentType: string; // passport, insurance, medical, etc.
   extractedData: Record<string, any>; // Flexible JSON with all extracted info
   confidence: number; // 0-100
+  personNames?: string[]; // NEW: Explicit person names extracted from document
 }
 
 export interface AnalysisError {
