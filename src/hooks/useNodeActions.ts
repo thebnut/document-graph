@@ -86,9 +86,18 @@ export function useNodeActions({
 
             // Apply layout to new children while preserving manual positions
             setTimeout(() => {
+              console.log('🔄 Expanding node:', node.id);
+              console.log('   Edges before layout:', edges.length);
+              console.log('   Edges:', edges.map(e => `${e.source} → ${e.target}`).join(', '));
+
               const layoutResult = layoutEngine.current.calculateLayout(allNodesData, edges, {
                 preserveManualPositions: true,
               });
+
+              console.log('   Nodes after layout:', layoutResult.nodes.length);
+              console.log('   Edges after layout:', layoutResult.edges.length);
+              console.log('   New edges:', layoutResult.edges.map(e => `${e.source} → ${e.target}`).join(', '));
+
               setAllNodesData(layoutResult.nodes);
               setEdges(layoutResult.edges);
 
