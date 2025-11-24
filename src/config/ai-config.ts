@@ -1,11 +1,13 @@
 /**
  * AI Configuration for Document Analysis
  * Configures OpenAI and document processing settings
+ *
+ * NOTE: OpenAI API key is now managed server-side in serverless functions.
+ * This config only contains client-side settings and prompts.
  */
 
 export interface AIConfig {
   openai: {
-    apiKey: string | undefined;
     model: string;
     visionModel: string;
     maxTokens: number;
@@ -30,7 +32,6 @@ export interface AIConfig {
 
 export const AI_CONFIG: AIConfig = {
   openai: {
-    apiKey: process.env.REACT_APP_OPENAI_API_KEY,
     model: 'gpt-4o',
     visionModel: 'gpt-4o',
     maxTokens: 2000,
@@ -104,7 +105,4 @@ Return ONLY a raw JSON object with this structure. Do not include markdown forma
   debug: true // Enable debugging by default
 };
 
-// Validation
-if (!AI_CONFIG.openai.apiKey && typeof window !== 'undefined') {
-  console.warn('OpenAI API key not configured. Document analysis features will be disabled.');
-}
+// Note: OpenAI API key validation is handled server-side in serverless functions
