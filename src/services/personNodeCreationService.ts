@@ -6,7 +6,7 @@
 import { ExtractedPerson } from './personExtractionService';
 import { personDeduplicationService } from './personDeduplicationService';
 import { DocumentGraphModel } from '../data/standalone-model-implementation';
-import { StandaloneEntity } from '../data/standalone-model';
+import { StandaloneEntity, EntitySubtype } from '../data/standalone-model';
 
 export interface PersonCreationResult {
   person: StandaloneEntity;
@@ -71,7 +71,9 @@ export class PersonNodeCreationService {
     userEmail: string = 'lifemap-builder'
   ): Promise<PersonCreationResult[]> {
     const results: PersonCreationResult[] = [];
-    const existingPeople = model.getEntities().filter((e) => e.type === 'person');
+    // Access entities directly from model data
+    const allEntities = (model as any).data.entities || [];
+    const existingPeople = allEntities.filter((e: any) => e.type === 'person');
 
     for (const extractedPerson of people) {
       // Check if person already exists
@@ -85,10 +87,8 @@ export class PersonNodeCreationService {
         console.log(`Person already exists: ${extractedPerson.fullName} → ${match.entity.label}`);
 
         // Get existing categories for this person
-        const existingCategories = model
-          .getEntities()
-          .filter(
-            (e) =>
+        const existingCategories = allEntities.filter(
+            (e: any) =>
               e.type === 'folder' &&
               e.parentIds &&
               e.parentIds.includes(match.entity.id)
@@ -109,9 +109,6 @@ export class PersonNodeCreationService {
         label: extractedPerson.fullName,
         description: `Detected from document: ${extractedPerson.source}`,
         level: 1,
-        hasChildren: true,
-        created: new Date().toISOString(),
-        modified: new Date().toISOString(),
         createdBy: userEmail,
         modifiedBy: userEmail,
         tags: ['person', 'family-member'],
@@ -160,15 +157,12 @@ export class PersonNodeCreationService {
     for (const categoryDef of this.DEFAULT_CATEGORIES) {
       const categoryEntity = model.addEntity({
         type: 'folder',
-        subtype: categoryDef.subtype,
+        subtype: categoryDef.subtype as EntitySubtype,
         label: categoryDef.label,
         description: `${person.label}'s ${categoryDef.description.toLowerCase()}`,
         level: 2,
         parentIds: [person.id],
-        hasChildren: false, // Initially no children
         ownership: 'individual',
-        created: new Date().toISOString(),
-        modified: new Date().toISOString(),
         createdBy: userEmail,
         modifiedBy: userEmail,
         metadata: {
@@ -233,15 +227,14 @@ export class PersonNodeCreationService {
     userEmail: string = 'lifemap-builder'
   ): Promise<StandaloneEntity | null> {
     // Find existing category
-    const existingCategory = model
-      .getEntities()
-      .find(
-        (e) =>
-          e.type === 'folder' &&
-          e.subtype === categorySubtype &&
-          e.parentIds &&
-          e.parentIds.includes(person.id)
-      );
+    const allEntities = (model as any).data.entities || [];
+    const existingCategory = allEntities.find(
+      (e: any) =>
+        e.type === 'folder' &&
+        e.subtype === categorySubtype &&
+        e.parentIds &&
+        e.parentIds.includes(person.id)
+    );
 
     if (existingCategory) {
       return existingCategory;
@@ -258,15 +251,12 @@ export class PersonNodeCreationService {
     // Create new category
     const categoryEntity = model.addEntity({
       type: 'folder',
-      subtype: categoryDef.subtype,
+      subtype: categoryDef.subtype as EntitySubtype,
       label: categoryDef.label,
       description: `${person.label}'s ${categoryDef.description.toLowerCase()}`,
       level: 2,
       parentIds: [person.id],
-      hasChildren: false,
       ownership: 'individual',
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
       createdBy: userEmail,
       modifiedBy: userEmail,
       metadata: {

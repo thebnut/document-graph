@@ -39,7 +39,7 @@ export class PersonDeduplicationService {
     for (const person of people) {
       let foundGroup = false;
 
-      for (const [key, group] of groups.entries()) {
+      for (const [key, group] of Array.from(groups.entries())) {
         const representative = group[0];
         const similarity = this.similarity(person.fullName, representative.fullName);
 
@@ -60,9 +60,9 @@ export class PersonDeduplicationService {
     // For each group, select the best representative
     const unique: ExtractedPerson[] = [];
 
-    for (const group of groups.values()) {
+    for (const group of Array.from(groups.values())) {
       // Sort by confidence (descending) and fullName completeness
-      group.sort((a, b) => {
+      group.sort((a: ExtractedPerson, b: ExtractedPerson) => {
         // Prefer higher confidence
         if (a.confidence !== b.confidence) {
           return b.confidence - a.confidence;

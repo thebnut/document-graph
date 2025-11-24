@@ -383,8 +383,6 @@ export class LifemapBuilderService {
           description: doc.analysis.documentType,
           level: 3,
           parentIds: [placementResult.parentNodeId],
-          created: new Date().toISOString(),
-          modified: new Date().toISOString(),
           createdBy: userEmail,
           modifiedBy: userEmail,
           metadata: {
