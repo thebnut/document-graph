@@ -56,7 +56,7 @@ export const LifemapBuilderWizard: React.FC<LifemapBuilderWizardProps> = ({
   const handleClose = () => {
     if (currentStep === 'building') {
       // Prevent closing during build
-      if (!confirm('Building is in progress. Are you sure you want to cancel?')) {
+      if (!window.confirm('Building is in progress. Are you sure you want to cancel?')) {
         return;
       }
     }

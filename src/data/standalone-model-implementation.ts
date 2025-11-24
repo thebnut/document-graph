@@ -547,8 +547,15 @@ export class DocumentGraphModel {
       
       return order === 'desc' ? -comparison : comparison;
     });
-    
+
     return sorted;
+  }
+
+  /**
+   * Get the raw data structure
+   */
+  getData(): StandaloneDocumentGraph {
+    return this.data;
   }
 }
 

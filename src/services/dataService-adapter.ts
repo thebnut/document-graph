@@ -295,6 +295,25 @@ export class DataService {
   updateEntity(id: string, updates: Partial<any>): any {
     return this.standaloneService.updateEntity(id, updates);
   }
+
+  /**
+   * Check if user needs to go through onboarding (Google Drive only)
+   */
+  needsOnboarding(): boolean {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      return this.standaloneService.needsOnboarding();
+    }
+    return false;
+  }
+
+  /**
+   * Complete onboarding by saving the family name (Google Drive only)
+   */
+  async completeOnboarding(familyName: string): Promise<void> {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      await this.standaloneService.completeOnboarding(familyName);
+    }
+  }
 }
 
 // Export singleton instance for backward compatibility

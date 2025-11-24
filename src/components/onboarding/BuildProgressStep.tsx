@@ -51,8 +51,7 @@ export const BuildProgressStep: React.FC<BuildProgressStepProps> = ({
           }
         );
 
-        // Save the updated model
-        await dataService.saveModel(model);
+        // Note: GoogleDriveDataService auto-saves changes, no need to explicitly save
 
         // Complete
         onComplete(result);

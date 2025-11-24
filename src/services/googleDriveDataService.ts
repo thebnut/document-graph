@@ -38,6 +38,7 @@ export class GoogleDriveDataService extends StandaloneDataService {
   private syncListeners: ((status: SyncStatus) => void)[] = [];
   private saveTimeout: NodeJS.Timeout | null = null;
   private lastSavedData: string | null = null;
+  private _needsOnboarding: boolean = false;
   
   private constructor(data?: StandaloneDocumentGraph) {
     super(data, true);
@@ -73,9 +74,13 @@ export class GoogleDriveDataService extends StandaloneDataService {
         console.log('Loaded data from Google Drive');
         this.model = new DocumentGraphModel(driveData);
         this.cacheDataLocally(driveData);
+        this._needsOnboarding = false;
       } else {
-        console.log('No data in Google Drive, migrating sample data');
-        await this.migrateAndSaveInitialData();
+        console.log('No data in Google Drive - onboarding needed');
+        this._needsOnboarding = true;
+        // Don't automatically migrate - let the wizard handle it
+        // User will be shown the LifemapBuilderWizard
+        return;
       }
       
       // Initialize person folders
@@ -295,7 +300,36 @@ export class GoogleDriveDataService extends StandaloneDataService {
   getSyncStatus(): SyncStatus {
     return { ...this.syncStatus };
   }
-  
+
+  /**
+   * Check if user needs to go through onboarding
+   */
+  needsOnboarding(): boolean {
+    return this._needsOnboarding;
+  }
+
+  /**
+   * Complete onboarding by saving the family name and model
+   */
+  async completeOnboarding(familyName: string): Promise<void> {
+    // Update the metadata with family name
+    const data = this.model.getData();
+    data.metadata.familyName = familyName;
+    data.metadata.modifiedBy = googleAuthService.getAuthState().userEmail || 'user';
+    data.metadata.modified = new Date().toISOString();
+
+    // Save to Drive
+    await this.saveToDrive(data);
+
+    // Cache locally
+    this.cacheDataLocally(data);
+
+    // Mark onboarding as complete
+    this._needsOnboarding = false;
+
+    console.log(`Onboarding completed for ${familyName}`);
+  }
+
   // Override methods that modify data to trigger auto-save
   
   addEntity(entity: Partial<any>): any {

@@ -25,6 +25,8 @@ import { TooltipPortal } from './overlays/TooltipPortal';
 import { DocumentViewer } from './DocumentViewer';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { BulkUploadModal } from './BulkUploadModal';
+import { LifemapBuilderWizard } from './onboarding';
+import { BuildResult } from '../services/lifemapBuilderService';
 import { useLayout } from '../hooks/useLayout';
 import { useGraphData } from '../hooks/useGraphData';
 import { useTooltip } from '../hooks/useTooltip';
@@ -63,6 +65,7 @@ export function DocumentGraphInner() {
   const [darkMode, setDarkMode] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wrapper to convert entity ID to Entity for document viewer
@@ -78,6 +81,57 @@ export function DocumentGraphInner() {
     // Only pre-defined parent-child relationships should exist
     return;
   }, []);
+
+  // Check if onboarding is needed
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      if (dataService.needsOnboarding && dataService.needsOnboarding()) {
+        console.log('Onboarding needed - showing wizard');
+        setShowOnboardingWizard(true);
+      }
+    };
+
+    checkOnboarding();
+  }, []);
+
+  // Handle wizard completion
+  const handleOnboardingComplete = React.useCallback(async (result: BuildResult) => {
+    console.log('Onboarding complete:', result);
+
+    // Extract family name from the result (use the family name from metadata)
+    const model = await dataService.getModel();
+    const familyName = model.getData().metadata.familyName || 'Family';
+
+    // Mark onboarding as complete
+    if (dataService.completeOnboarding) {
+      await dataService.completeOnboarding(familyName);
+    }
+
+    // Close wizard
+    setShowOnboardingWizard(false);
+
+    // Reload graph data
+    const allNodes = dataService.entitiesToNodes();
+    console.log('Reloaded nodes after onboarding:', allNodes.length);
+
+    const edgesData = dataService.relationshipsToEdges();
+    console.log('Reloaded edges after onboarding:', edgesData.length);
+    graphData.setEdges(edgesData);
+
+    const layoutResult = layoutEngine.current.calculateLayout(allNodes, edgesData, {
+      preserveManualPositions: false,
+    });
+    graphData.setAllNodesData(layoutResult.nodes);
+    graphData.setEdges(layoutResult.edges);
+
+    // Initially show family root, level 1 (people), and level 2 (categories) nodes
+    const initialVisibleNodes = layoutResult.nodes.filter((n) => {
+      const nodeData = n.data as NodeData;
+      return nodeData.level === 0 || nodeData.level === 1 || nodeData.level === 2;
+    });
+
+    graphData.setNodes(initialVisibleNodes);
+  }, [layoutEngine, graphData]);
 
   // Initialize with data from data service
   useEffect(() => {
@@ -281,6 +335,14 @@ export function DocumentGraphInner() {
             console.log(`Added ${count} documents via bulk upload`);
             graphData.refreshGraphFromDataModel();
           }}
+          darkMode={darkMode}
+        />
+
+        {/* Onboarding Wizard */}
+        <LifemapBuilderWizard
+          isOpen={showOnboardingWizard}
+          onClose={() => setShowOnboardingWizard(false)}
+          onComplete={handleOnboardingComplete}
           darkMode={darkMode}
         />
       </div>
