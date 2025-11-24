@@ -136,6 +136,13 @@ export function DocumentGraphInner() {
         const immediateParentExpanded = nodeData.parentIds.some((parentId) =>
           graphData.expandedNodes.has(parentId)
         );
+        if (node.id === 'anya-hospital-discharge') {
+          console.log('🔍 Checking visibility for Hospital Discharge:');
+          console.log('   Level:', nodeData.level);
+          console.log('   Parent IDs:', nodeData.parentIds);
+          console.log('   Expanded nodes:', Array.from(graphData.expandedNodes));
+          console.log('   Immediate parent expanded:', immediateParentExpanded);
+        }
         if (!immediateParentExpanded) return false;
 
         // For level 4 nodes, also check if grandparent is expanded
