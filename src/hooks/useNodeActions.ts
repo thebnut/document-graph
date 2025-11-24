@@ -5,8 +5,8 @@
  */
 
 import { useCallback } from 'react';
-import { useReactFlow } from 'reactflow';
-import type { Node, Edge } from 'reactflow';
+import { useReactFlow } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 import { dataService } from '../services/dataService-adapter';
 import type { NodeData } from '../services/dataService-adapter';
 import type { D3RadialLayoutEngine } from '../services/d3RadialLayoutEngine';

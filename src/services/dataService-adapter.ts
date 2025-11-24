@@ -3,7 +3,7 @@
  * This allows gradual migration of the UI components
  */
 
-import { Node, Edge } from 'reactflow';
+import { Node, Edge } from '@xyflow/react';
 import { StandaloneDataService, NodeData } from './standaloneDataService';
 import { GoogleDriveDataService } from './googleDriveDataService';
 import { googleAuthService } from './googleAuthService';

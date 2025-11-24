@@ -5,8 +5,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import { useNodesState, useEdgesState } from 'reactflow';
-import type { Node, Edge } from 'reactflow';
+import { useNodesState, useEdgesState } from '@xyflow/react';
+import type { Node, Edge } from '@xyflow/react';
 import { dataService } from '../services/dataService-adapter';
 import type { NodeData } from '../services/dataService-adapter';
 import type { D3RadialLayoutEngine } from '../services/d3RadialLayoutEngine';
@@ -16,8 +16,8 @@ interface UseGraphDataOptions {
 }
 
 export function useGraphData({ layoutEngine }: UseGraphDataOptions) {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [allNodesData, setAllNodesData] = useState<Node[]>([]);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 

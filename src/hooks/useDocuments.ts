@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from 'react';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import { dataService } from '../services/dataService-adapter';
 
 interface UseDocumentsOptions {

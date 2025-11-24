@@ -6,7 +6,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { useSearch } from '../useSearch';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import { createMockEntity } from '../../test-utils/mockFactories';
 
 describe('useSearch', () => {

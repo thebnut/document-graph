@@ -5,8 +5,8 @@
  */
 
 import React from 'react';
-import { ReactFlowProvider } from 'reactflow';
-import 'reactflow/dist/style.css';
+import { ReactFlowProvider } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 
 // Initialize ResizeObserver error suppression
 import { initializeResizeObserverFix } from './utils/resizeObserverFix';

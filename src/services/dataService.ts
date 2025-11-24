@@ -1,4 +1,4 @@
-import { Node, Edge } from 'reactflow';
+import { Node, Edge } from '@xyflow/react';
 import { DocumentGraphModel, Entity, EntityRelationship, EntityWithComputed } from '../data/model';
 import sampleData from '../data/sampleData.json';
 import expandedSampleData from '../data/expandedSampleData.json';
@@ -10,6 +10,8 @@ export interface NodeData extends EntityWithComputed {
   layoutAngle?: number;
   layoutRadius?: number;
   layoutDepth?: number;
+  // Index signature for ReactFlow v12 compatibility
+  [key: string]: unknown;
 }
 
 export class DataService {

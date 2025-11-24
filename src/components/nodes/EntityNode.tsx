@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position } from '@xyflow/react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { getNodeSize, getIconSize } from '../../utils/sizeMapper';
 import { getNodeColor } from '../../utils/colorMapper';

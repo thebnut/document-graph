@@ -5,18 +5,20 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   BackgroundVariant,
   Controls,
   MiniMap,
   Connection,
   Panel,
-} from 'reactflow';
+} from '@xyflow/react';
 import { useDocumentViewer } from '../contexts/DocumentViewerContext';
 import { dataService } from '../services/dataService-adapter';
 import type { NodeData } from '../services/dataService-adapter';
 import { nodeTypes } from '../config/nodeTypes';
+import { edgeTypes, getEdgeOptions } from '../config/edgeTypes';
 import { ControlsPanel } from './panels/ControlsPanel';
 import { AddNodeModal } from './modals/AddNodeModal';
 import { TooltipPortal } from './overlays/TooltipPortal';
@@ -189,6 +191,8 @@ export function DocumentGraphInner() {
           onNodeClick={nodeActions.onNodeClick}
           onNodeDragStop={nodeActions.handleNodeDragStop}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={getEdgeOptions(darkMode)}
           fitView
           className="bg-transparent"
         >

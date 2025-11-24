@@ -5,7 +5,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 import type { NodeData } from '../services/dataService-adapter';
 
 export function useSearch() {

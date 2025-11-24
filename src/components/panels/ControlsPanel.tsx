@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Panel } from 'reactflow';
+import { Panel } from '@xyflow/react';
 import { Search, Upload, FileText, RotateCcw, Sun, Moon } from 'lucide-react';
 
 interface ControlsPanelProps {

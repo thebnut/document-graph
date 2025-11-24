@@ -1,4 +1,4 @@
-import { Node, Edge } from 'reactflow';
+import { Node, Edge } from '@xyflow/react';
 import { hierarchy, tree, stratify, HierarchyNode } from 'd3-hierarchy';
 import { NodeData } from '../services/dataService';
 import { EntityType } from '../data/model';
@@ -15,7 +15,7 @@ interface NodeDimensions {
 }
 
 interface LayoutResult {
-  nodes: Node[];
+  nodes: Node<Record<string, unknown>>[];
   edges: Edge[];
 }
 
@@ -25,7 +25,7 @@ export class D3RadialLayoutEngine {
   private maxRadius = 600;
 
   public calculateLayout(
-    nodes: Node[],
+    nodes: Node<Record<string, unknown>>[],
     edges: Edge[],
     options: LayoutOptions = {}
   ): LayoutResult {
@@ -41,7 +41,7 @@ export class D3RadialLayoutEngine {
     const hierarchyRoot = this.createHierarchy(processedData.nodes, processedData.edges);
     
     // Step 2: Configure radial layout with enhanced separation
-    const treeLayout = tree<Node>()
+    const treeLayout = tree<Node<Record<string, unknown>>>()
       .size([2 * Math.PI, this.maxRadius])
       .separation(this.enhancedRadialSeparation.bind(this));
     
@@ -49,7 +49,7 @@ export class D3RadialLayoutEngine {
     const root = treeLayout(hierarchyRoot);
     
     // Step 4: Convert to ReactFlow nodes with cartesian coords
-    let layoutedNodes = root.descendants().map(d => {
+    let layoutedNodes: Node<Record<string, unknown>>[] = root.descendants().map(d => {
       // Special handling for root node (centered)
       if (d.depth === 0) {
         return {
@@ -61,16 +61,16 @@ export class D3RadialLayoutEngine {
             layoutRadius: 0,
             layoutDepth: d.depth
           }
-        };
+        } as Node<Record<string, unknown>>;
       }
-      
+
       // Convert polar (x=angle, y=radius) to cartesian
       const x = this.centerX + d.y * Math.cos(d.x - Math.PI / 2);
       const y = this.centerY + d.y * Math.sin(d.x - Math.PI / 2);
-      
+
       // Find original node to preserve ReactFlow properties
       const originalNode = processedData.nodes.find(n => n.id === d.data.id);
-      
+
       return {
         ...originalNode!,
         position: { x, y },
@@ -81,7 +81,7 @@ export class D3RadialLayoutEngine {
           layoutRadius: d.y,
           layoutDepth: d.depth
         }
-      };
+      } as Node<Record<string, unknown>>;
     });
     
     // Step 5: Preserve manual positions if requested
@@ -96,11 +96,11 @@ export class D3RadialLayoutEngine {
   }
 
   private injectFamilyRootNode(
-    nodes: Node[],
+    nodes: Node<Record<string, unknown>>[],
     edges: Edge[]
-  ): { nodes: Node[], edges: Edge[] } {
+  ): { nodes: Node<Record<string, unknown>>[], edges: Edge[] } {
     // Create the family root node
-    const familyNode: Node = {
+    const familyNode: Node<Record<string, unknown>> = {
       id: 'family-root',
       type: 'entity',
       position: { x: 0, y: 0 }, // Will be recalculated by layout
@@ -124,7 +124,7 @@ export class D3RadialLayoutEngine {
       id: `family-to-${node.id}`,
       source: 'family-root',
       target: node.id,
-      type: 'smoothstep',
+      type: 'smart',
       animated: false
     }));
     
@@ -143,7 +143,7 @@ export class D3RadialLayoutEngine {
     };
   }
 
-  private createHierarchy(nodes: Node[], edges: Edge[]): HierarchyNode<Node> {
+  private createHierarchy(nodes: Node<Record<string, unknown>>[], edges: Edge[]): HierarchyNode<Node<Record<string, unknown>>> {
     // Create parent mapping from edges
     const parentMap = new Map<string, string>();
     edges.forEach(edge => {
@@ -151,14 +151,14 @@ export class D3RadialLayoutEngine {
     });
 
     // Ensure we have a family root node
-    const rootNode = nodes.find(n => n.id === 'family-root' || (n.data as NodeData).level === 0);
+    const rootNode = nodes.find(n => n.id === 'family-root' || (n.data as any).level === 0);
     if (!rootNode) {
       throw new Error('No root node found in hierarchy');
     }
 
     // Use d3.stratify to build hierarchy
     try {
-      const stratifyFunc = stratify<Node>()
+      const stratifyFunc = stratify<Node<Record<string, unknown>>>()
         .id(d => d.id)
         .parentId(d => {
           // For ReactFlow nodes, get parent from edge mapping
@@ -227,18 +227,18 @@ export class D3RadialLayoutEngine {
   }
 
   private preserveManualPositions(
-    layoutedNodes: Node[],
-    originalNodes: Node[]
-  ): Node[] {
+    layoutedNodes: Node<Record<string, unknown>>[],
+    originalNodes: Node<Record<string, unknown>>[]
+  ): Node<Record<string, unknown>>[] {
     const manualPositionMap = new Map<string, { x: number; y: number }>();
-    
+
     // Collect manually positioned nodes
     originalNodes.forEach(node => {
-      if ((node.data as NodeData).isManuallyPositioned) {
+      if ((node.data as any).isManuallyPositioned) {
         manualPositionMap.set(node.id, node.position);
       }
     });
-    
+
     // Apply manual positions to layouted nodes
     return layoutedNodes.map(node => {
       if (manualPositionMap.has(node.id)) {
@@ -249,7 +249,7 @@ export class D3RadialLayoutEngine {
             ...node.data,
             isManuallyPositioned: true
           }
-        };
+        } as Node<Record<string, unknown>>;
       }
       return node;
     });

@@ -2,7 +2,7 @@
  * ReactFlow Node Types Configuration
  */
 
-import type { NodeTypes } from 'reactflow';
+import type { NodeTypes } from '@xyflow/react';
 import { EntityNode } from '../components/nodes/EntityNode';
 
 export const nodeTypes: NodeTypes = {

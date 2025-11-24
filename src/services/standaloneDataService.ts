@@ -3,7 +3,7 @@
  * Provides backward compatibility with existing UI while using new data structure
  */
 
-import { Node, Edge } from 'reactflow';
+import { Node, Edge } from '@xyflow/react';
 import { DocumentGraphModel } from '../data/standalone-model-implementation';
 import { StandaloneDocumentGraph, StandaloneEntity, Query } from '../data/standalone-model';
 import { Entity, EntityRelationship, DocumentGraphModel as OldModel } from '../data/model';
@@ -17,13 +17,13 @@ export interface NodeData extends StandaloneEntity {
   // Callbacks
   onShowTooltip?: (nodeId: string, data: NodeData, event: React.MouseEvent) => void;
   onHideTooltip?: () => void;
-  
+
   // Layout properties
   isRootNode?: boolean;
   layoutAngle?: number;
   layoutRadius?: number;
   layoutDepth?: number;
-  
+
   // Backward compatibility properties (from old model)
   hasChildren?: boolean;
   isExpanded?: boolean;
@@ -31,6 +31,9 @@ export interface NodeData extends StandaloneEntity {
   source?: string;
   documentPath?: string;
   documentType?: 'image' | 'pdf' | 'other';
+
+  // Index signature for ReactFlow v12 compatibility
+  [key: string]: unknown;
 }
 
 /**
@@ -66,7 +69,7 @@ export class StandaloneToReactFlowAdapter {
       id: rel.id,
       source: rel.source,
       target: rel.target,
-      type: 'smoothstep',
+      type: 'smart',
       animated: false,
       label: rel.label
     };

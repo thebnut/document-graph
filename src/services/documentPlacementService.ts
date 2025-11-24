@@ -21,7 +21,7 @@ export interface PlacementDecision {
   createNewParent?: {
     label: string;
     type: string;
-    parentId: string;
+    level: number;
   };
 }
 

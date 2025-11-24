@@ -7,7 +7,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDocuments } from '../useDocuments';
 import { dataService } from '../../services/dataService-adapter';
-import type { Node } from 'reactflow';
+import type { Node } from '@xyflow/react';
 
 // Mock the dataService
 jest.mock('../../services/dataService-adapter', () => ({
