@@ -33,7 +33,7 @@ export interface NodeData extends StandaloneEntity {
   documentType?: 'image' | 'pdf' | 'other';
 
   // Index signature for ReactFlow v12 compatibility
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 /**

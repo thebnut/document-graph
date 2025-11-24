@@ -11,7 +11,7 @@ export interface NodeData extends EntityWithComputed {
   layoutRadius?: number;
   layoutDepth?: number;
   // Index signature for ReactFlow v12 compatibility
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export class DataService {
