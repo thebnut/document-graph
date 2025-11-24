@@ -124,7 +124,7 @@ export class D3RadialLayoutEngine {
       id: `family-to-${node.id}`,
       source: 'family-root',
       target: node.id,
-      type: 'smart',
+      type: 'straight',
       animated: false
     }));
     

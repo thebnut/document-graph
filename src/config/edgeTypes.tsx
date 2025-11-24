@@ -1,32 +1,23 @@
 /**
  * ReactFlow Edge Types Configuration
- * Uses smart edges with A* pathfinding to avoid node collisions
+ * Uses simple straight edges for clean radial layouts
  */
 
 import type { EdgeTypes } from '@xyflow/react';
-import { SmartStepEdge } from '@tisoap/react-flow-smart-edge';
 
-export const edgeTypes: EdgeTypes = {
-  // Smart edge that routes around nodes using A* pathfinding
-  smart: SmartStepEdge,
-};
+// No custom edge types needed - using built-in straight edges
+export const edgeTypes: EdgeTypes = {};
 
 /**
- * Default edge options for smart edges
- * These ensure smooth, collision-free routing
+ * Default edge options for straight edges
+ * Clean, direct lines for radial layouts
  */
 export const defaultEdgeOptions = {
-  type: 'smart',
+  type: 'straight',
   animated: false,
   style: {
     strokeWidth: 2,
     stroke: '#b1b1b7', // Neutral gray for light mode
-  },
-  // Smart edge specific options
-  options: {
-    drawEdge: true,
-    generatePath: undefined, // Uses default A* pathfinding
-    nodePadding: 10, // Padding around nodes for pathfinding
   },
 };
 

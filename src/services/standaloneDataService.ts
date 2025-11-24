@@ -69,7 +69,7 @@ export class StandaloneToReactFlowAdapter {
       id: rel.id,
       source: rel.source,
       target: rel.target,
-      type: 'smart',
+      type: 'straight',
       animated: false,
       label: rel.label
     };
