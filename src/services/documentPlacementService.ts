@@ -163,6 +163,7 @@ export class DocumentPlacementService {
     let current: StandaloneEntity | null = null;
     
     for (const segment of path) {
+      // eslint-disable-next-line no-loop-func
       const found = entities.find(e => {
         const matchesLabel = e.label === segment;
         const isChild = !current || e.parentIds?.includes(current.id);

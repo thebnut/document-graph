@@ -100,7 +100,8 @@ export function DocumentGraphInner() {
     });
 
     graphData.setNodes(initialVisibleNodes);
-  }, [graphData.setNodes, graphData.setEdges, layoutEngine]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutEngine]);
 
   // Update node expansion state and visibility
   useEffect(() => {
@@ -161,7 +162,8 @@ export function DocumentGraphInner() {
     });
 
     graphData.setNodes(visibleNodes);
-  }, [graphData.expandedNodes, graphData.allNodesData, graphData.setNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphData.expandedNodes, graphData.allNodesData]);
 
   // Apply search filter and add tooltip handlers to nodes
   const nodesToDisplay = search.filterNodesBySearch(graphData.nodes).map((node) => ({

@@ -6,7 +6,7 @@
 import { Node, Edge } from '@xyflow/react';
 import { DocumentGraphModel } from '../data/standalone-model-implementation';
 import { StandaloneDocumentGraph, StandaloneEntity, Query } from '../data/standalone-model';
-import { Entity, EntityRelationship, DocumentGraphModel as OldModel } from '../data/model';
+import { DocumentGraphModel as OldModel } from '../data/model';
 import { DataMigration } from '../data/migration-utils';
 import { config } from '../config/app-config';
 import sampleData from '../data/sampleData.json';
@@ -133,11 +133,10 @@ export class StandaloneDataService {
     
     // The migration is async, but we'll handle it synchronously for now
     const migrationPromise = this.migrationTool.migrateToStandalone(oldData, googleAccount);
-    
+
     // Temporary: block until migration completes
     // In production, show a migration progress UI
-    let result: any;
-    migrationPromise.then(r => result = r);
+    void migrationPromise;
     
     // For now, return a simplified migration
     return {

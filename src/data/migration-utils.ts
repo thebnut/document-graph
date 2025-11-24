@@ -2,7 +2,7 @@
  * Migration utilities for converting existing data to standalone model with Google Drive
  */
 
-import { Entity, EntityWithComputed, DocumentGraphModel as OldModel } from './model';
+import { Entity, DocumentGraphModel as OldModel } from './model';
 import { 
   StandaloneEntity, 
   StandaloneDocumentGraph, 

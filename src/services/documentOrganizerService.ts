@@ -5,7 +5,7 @@
 
 import { googleDriveService } from './googleDriveService';
 import { googleAuthService } from './googleAuthService';
-import { StandaloneEntity, EntityType } from '../data/standalone-model';
+import { StandaloneEntity } from '../data/standalone-model';
 import { DocumentGraphModel } from '../data/standalone-model-implementation';
 
 interface PersonFolder {

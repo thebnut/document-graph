@@ -5,8 +5,8 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { X, Upload, FileText, AlertCircle, CheckCircle, Loader, FileUp } from 'lucide-react';
-import { documentAnalysisService, DocumentAnalysis, AnalysisError } from '../services/documentAnalysisService';
-import { documentPlacementService, PlacementDecision, PlacementError } from '../services/documentPlacementService';
+import { documentAnalysisService, DocumentAnalysis } from '../services/documentAnalysisService';
+import { documentPlacementService, PlacementDecision } from '../services/documentPlacementService';
 import { dataService } from '../services/dataService-adapter';
 import { AI_CONFIG } from '../config/ai-config';
 
