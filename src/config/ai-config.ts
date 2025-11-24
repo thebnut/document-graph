@@ -44,7 +44,7 @@ export const AI_CONFIG: AIConfig = {
       'image/jpeg',
       'image/png',
       'image/webp',
-      'application/pdf'
+      // Note: PDFs not supported - OpenAI Vision API only accepts images
     ],
     confidenceLevels: {
       high: 80,   // Auto-create node

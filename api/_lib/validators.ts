@@ -8,13 +8,12 @@ import type { ValidationResult, AnalyzeDocumentRequest, DeterminePlacementReques
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const MAX_BASE64_SIZE = MAX_FILE_SIZE * 1.37; // Base64 is ~37% larger
 
-// Supported MIME types
+// Supported MIME types (OpenAI Vision API only supports images)
 const SUPPORTED_MIME_TYPES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
-  'application/pdf',
 ];
 
 /**

@@ -183,7 +183,7 @@ export function isFileSupported(file: File): boolean {
     'image/jpg',
     'image/png',
     'image/webp',
-    'application/pdf',
+    // Note: PDFs not supported - OpenAI Vision API only accepts images
   ];
 
   return supportedTypes.includes(file.type.toLowerCase());
