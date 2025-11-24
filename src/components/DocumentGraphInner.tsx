@@ -45,6 +45,7 @@ export function DocumentGraphInner() {
     allNodesData: graphData.allNodesData,
     setAllNodesData: graphData.setAllNodesData,
     edges: graphData.edges,
+    setEdges: graphData.setEdges,
     expandedNodes: graphData.expandedNodes,
     setExpandedNodes: graphData.setExpandedNodes,
     getAllDescendantIds: graphData.getAllDescendantIds,

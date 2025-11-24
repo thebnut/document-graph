@@ -15,6 +15,7 @@ interface UseNodeActionsOptions {
   allNodesData: Node[];
   setAllNodesData: (nodes: Node[] | ((prev: Node[]) => Node[])) => void;
   edges: Edge[];
+  setEdges: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void;
   expandedNodes: Set<string>;
   setExpandedNodes: (nodes: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
   getAllDescendantIds: (nodeId: string) => string[];
@@ -26,6 +27,7 @@ export function useNodeActions({
   allNodesData,
   setAllNodesData,
   edges,
+  setEdges,
   expandedNodes,
   setExpandedNodes,
   getAllDescendantIds,
@@ -88,6 +90,7 @@ export function useNodeActions({
                 preserveManualPositions: true,
               });
               setAllNodesData(layoutResult.nodes);
+              setEdges(layoutResult.edges);
 
               const children = layoutResult.nodes.filter((n) =>
                 (n.data as NodeData).parentIds?.includes(node.id)
@@ -115,6 +118,7 @@ export function useNodeActions({
     [
       allNodesData,
       edges,
+      setEdges,
       reactFlowInstance,
       getAllDescendantIds,
       setExpandedNodes,
