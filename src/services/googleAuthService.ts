@@ -313,13 +313,15 @@ class GoogleAuthService {
   }
   
   /**
-   * Clear stored tokens
+   * Clear stored tokens and all cached data
    */
   private clearStoredTokens(): void {
     if (typeof window === 'undefined') return; // Skip during webpack build
 
     try {
       window.localStorage.removeItem('lifemap-google-tokens');
+      // Also clear the cached lifemap data on logout
+      window.localStorage.removeItem('lifemap-data-cache');
     } catch (error) {
       // localStorage not available
     }

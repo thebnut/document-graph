@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { googleAuthService, AuthState } from '../services/googleAuthService';
 import { googleDriveService } from '../services/googleDriveService';
+import { GoogleDriveDataService } from '../services/googleDriveDataService';
 
 interface AuthContextValue {
   authState: AuthState;
@@ -99,6 +100,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = useCallback(async () => {
     try {
       await googleAuthService.signOut();
+      // Reset the data service singleton to clear cached data
+      GoogleDriveDataService.resetInstance();
+      // Reload the page to ensure a clean state
+      window.location.reload();
     } catch (error) {
       console.error('Sign out failed:', error);
       throw error;

@@ -10,9 +10,6 @@ import { googleDriveService } from './googleDriveService';
 import { googleAuthService } from './googleAuthService';
 import { documentOrganizerService } from './documentOrganizerService';
 import { config } from '../config/app-config';
-import expandedSampleData from '../data/expandedSampleData.json';
-import { DataMigration } from '../data/migration-utils';
-import { DocumentGraphModel as OldModel } from '../data/model';
 
 export interface SyncStatus {
   isSyncing: boolean;
@@ -44,7 +41,30 @@ export class GoogleDriveDataService extends StandaloneDataService {
   private _initializationResolve: (() => void) | null = null;
 
   private constructor(data?: StandaloneDocumentGraph) {
-    super(data, true);
+    // Create an empty data structure to avoid loading sample data
+    // Real data will be loaded from Google Drive during initialize()
+    const emptyData: StandaloneDocumentGraph = data || {
+      id: 'pending',
+      version: '1.0.0',
+      schema: 'https://lifemap.app/schema/v1',
+      metadata: {
+        title: 'Loading...',
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        createdBy: 'system',
+        modifiedBy: 'system',
+        tenant: 'pending',
+      },
+      entities: [],
+      relationships: [],
+      permissions: {
+        owners: [],
+        editors: [],
+        viewers: [],
+        publicRead: false,
+      },
+    };
+    super(emptyData, false);
   }
   
   static getInstance(): GoogleDriveDataService {
@@ -184,26 +204,6 @@ export class GoogleDriveDataService extends StandaloneDataService {
    */
   private async saveToDrive(data: StandaloneDocumentGraph): Promise<void> {
     await googleDriveService.saveDataModel(data);
-  }
-  
-  /**
-   * Migrate sample data and save to Drive
-   */
-  private async migrateAndSaveInitialData(): Promise<void> {
-    const migrationTool = new DataMigration();
-    const oldData = expandedSampleData as OldModel;
-    const userEmail = googleAuthService.getAuthState().userEmail || 'user@example.com';
-    
-    const migrationResult = await migrationTool.migrateToStandalone(oldData, userEmail);
-    
-    // Save to Drive
-    await this.saveToDrive(migrationResult.graph);
-    
-    // Update local model
-    this.model = new DocumentGraphModel(migrationResult.graph);
-    
-    // Cache locally
-    this.cacheDataLocally(migrationResult.graph);
   }
   
   /**
