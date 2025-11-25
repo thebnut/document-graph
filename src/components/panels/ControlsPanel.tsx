@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Panel } from '@xyflow/react';
-import { Search, Upload, FileText, RotateCcw, Sun, Moon } from 'lucide-react';
+import { Search, Upload, FileText, RotateCcw, Sun, Moon, LogOut } from 'lucide-react';
 
 interface ControlsPanelProps {
   searchQuery: string;
@@ -15,6 +15,7 @@ interface ControlsPanelProps {
   onUploadDocument: () => void;
   onBulkUpload: () => void;
   onResetCanvas: () => void;
+  onLogout: () => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -28,6 +29,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
   onUploadDocument,
   onBulkUpload,
   onResetCanvas,
+  onLogout,
   darkMode,
   onToggleDarkMode,
   fileInputRef,
@@ -97,8 +99,18 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       <button
         onClick={onToggleDarkMode}
         className="bg-gray-200 dark:bg-gray-700 rounded-lg p-2 transition-colors shadow-lg"
+        title="Toggle Dark Mode"
       >
         {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
+
+      {/* Logout Button */}
+      <button
+        onClick={onLogout}
+        className="bg-red-500 hover:bg-red-600 text-white rounded-lg p-2 transition-colors shadow-lg"
+        title="Sign Out"
+      >
+        <LogOut className="w-5 h-5" />
       </button>
     </Panel>
   );

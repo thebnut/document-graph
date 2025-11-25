@@ -15,6 +15,7 @@ import {
   Panel,
 } from '@xyflow/react';
 import { useDocumentViewer } from '../contexts/DocumentViewerContext';
+import { useAuth } from '../contexts/AuthContext';
 import { dataService } from '../services/dataService-adapter';
 import type { NodeData } from '../services/dataService-adapter';
 import { nodeTypes } from '../config/nodeTypes';
@@ -41,6 +42,7 @@ export function DocumentGraphInner() {
   const tooltip = useTooltip();
   const search = useSearch();
   const { openDocument } = useDocumentViewer();
+  const { signOut } = useAuth();
 
   // Node actions hook
   const nodeActions = useNodeActions({
@@ -305,6 +307,7 @@ export function DocumentGraphInner() {
             onUploadDocument={() => fileInputRef.current?.click()}
             onBulkUpload={() => setShowBulkUploadModal(true)}
             onResetCanvas={nodeActions.handleResetCanvas}
+            onLogout={signOut}
             darkMode={darkMode}
             onToggleDarkMode={() => setDarkMode(!darkMode)}
             fileInputRef={fileInputRef}
