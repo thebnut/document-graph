@@ -82,12 +82,22 @@ export function DocumentGraphInner() {
     return;
   }, []);
 
-  // Check if onboarding is needed
+  // Check if onboarding is needed (wait for initialization first)
   useEffect(() => {
     const checkOnboarding = async () => {
+      // Wait for data service to finish initializing
+      if (dataService.waitForInitialization) {
+        console.log('Waiting for data service initialization...');
+        await dataService.waitForInitialization();
+        console.log('Data service initialized');
+      }
+
+      // Now check if onboarding is needed
       if (dataService.needsOnboarding && dataService.needsOnboarding()) {
         console.log('Onboarding needed - showing wizard');
         setShowOnboardingWizard(true);
+      } else {
+        console.log('Onboarding not needed - data exists');
       }
     };
 

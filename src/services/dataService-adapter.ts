@@ -314,6 +314,26 @@ export class DataService {
       await this.standaloneService.completeOnboarding(familyName);
     }
   }
+
+  /**
+   * Wait for data service initialization to complete (Google Drive only)
+   * Returns immediately for non-Google Drive services
+   */
+  async waitForInitialization(): Promise<void> {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      await this.standaloneService.waitForInitialization();
+    }
+  }
+
+  /**
+   * Check if the data service has finished initializing
+   */
+  isInitialized(): boolean {
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      return this.standaloneService.isInitialized();
+    }
+    return true; // Non-Google Drive services are always "initialized"
+  }
 }
 
 // Export singleton instance for backward compatibility

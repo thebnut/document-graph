@@ -39,7 +39,10 @@ export class GoogleDriveDataService extends StandaloneDataService {
   private saveTimeout: NodeJS.Timeout | null = null;
   private lastSavedData: string | null = null;
   private _needsOnboarding: boolean = false;
-  
+  private _isInitialized: boolean = false;
+  private _initializationPromise: Promise<void> | null = null;
+  private _initializationResolve: (() => void) | null = null;
+
   private constructor(data?: StandaloneDocumentGraph) {
     super(data, true);
   }
@@ -59,17 +62,33 @@ export class GoogleDriveDataService extends StandaloneDataService {
    * Initialize the service and load data
    */
   async initialize(): Promise<void> {
-    if (!googleAuthService.isAuthenticated()) {
-      console.log('Not authenticated, using sample data');
+    // If already initialized, return immediately
+    if (this._isInitialized) {
       return;
     }
-    
+
+    // If initialization is already in progress, return the existing promise
+    if (this._initializationPromise) {
+      return this._initializationPromise;
+    }
+
+    // Create a new initialization promise
+    this._initializationPromise = new Promise((resolve) => {
+      this._initializationResolve = resolve;
+    });
+
+    if (!googleAuthService.isAuthenticated()) {
+      console.log('Not authenticated, using sample data');
+      this._markInitialized();
+      return;
+    }
+
     try {
       this.updateSyncStatus({ isSyncing: true });
-      
+
       // Try to load from Google Drive
       const driveData = await this.loadFromDrive();
-      
+
       if (driveData) {
         console.log('Loaded data from Google Drive');
         this.model = new DocumentGraphModel(driveData);
@@ -80,6 +99,7 @@ export class GoogleDriveDataService extends StandaloneDataService {
         this._needsOnboarding = true;
         // Don't automatically migrate - let the wizard handle it
         // User will be shown the LifemapBuilderWizard
+        this._markInitialized();
         return;
       }
       
@@ -94,26 +114,62 @@ export class GoogleDriveDataService extends StandaloneDataService {
         // Don't fail the whole initialization if folder creation fails
       }
       
-      this.updateSyncStatus({ 
-        isSyncing: false, 
+      this.updateSyncStatus({
+        isSyncing: false,
         lastSyncTime: new Date(),
-        syncError: null 
+        syncError: null
       });
+
+      this._markInitialized();
     } catch (error) {
       console.error('Failed to load from Google Drive:', error);
-      
+
       // Try to load from local cache
       const cachedData = this.loadFromLocalCache();
       if (cachedData) {
         console.log('Loaded data from local cache');
         this.model = new DocumentGraphModel(cachedData);
       }
-      
-      this.updateSyncStatus({ 
-        isSyncing: false, 
+
+      this.updateSyncStatus({
+        isSyncing: false,
         syncError: error instanceof Error ? error.message : 'Unknown error'
       });
+
+      this._markInitialized();
     }
+  }
+
+  /**
+   * Mark initialization as complete and resolve waiting promises
+   */
+  private _markInitialized(): void {
+    this._isInitialized = true;
+    if (this._initializationResolve) {
+      this._initializationResolve();
+    }
+  }
+
+  /**
+   * Wait for initialization to complete
+   * Returns immediately if already initialized
+   */
+  async waitForInitialization(): Promise<void> {
+    if (this._isInitialized) {
+      return;
+    }
+    if (this._initializationPromise) {
+      return this._initializationPromise;
+    }
+    // Initialization hasn't started yet, trigger it
+    return this.initialize();
+  }
+
+  /**
+   * Check if the service has finished initializing
+   */
+  isInitialized(): boolean {
+    return this._isInitialized;
   }
   
   /**
