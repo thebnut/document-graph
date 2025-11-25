@@ -29,7 +29,6 @@ export const LifemapBuilderWizard: React.FC<LifemapBuilderWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<WizardStep>('family-name');
   const [familyName, setFamilyName] = useState<string>('');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [buildProgress, setBuildProgress] = useState<BuildProgress | null>(null);
   const [buildResult, setBuildResult] = useState<BuildResult | null>(null);
 
   if (!isOpen) return null;
@@ -44,8 +43,9 @@ export const LifemapBuilderWizard: React.FC<LifemapBuilderWizardProps> = ({
     setCurrentStep('building');
   };
 
-  const handleBuildProgress = (progress: BuildProgress) => {
-    setBuildProgress(progress);
+  const handleBuildProgress = (_progress: BuildProgress) => {
+    // Progress is managed internally by BuildProgressStep
+    // This callback is here for future extensibility
   };
 
   const handleBuildComplete = (result: BuildResult) => {

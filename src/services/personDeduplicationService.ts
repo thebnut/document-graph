@@ -39,7 +39,7 @@ export class PersonDeduplicationService {
     for (const person of people) {
       let foundGroup = false;
 
-      for (const [key, group] of Array.from(groups.entries())) {
+      for (const group of Array.from(groups.values())) {
         const representative = group[0];
         const similarity = this.similarity(person.fullName, representative.fullName);
 

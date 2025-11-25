@@ -71,7 +71,8 @@ export const BuildProgressStep: React.FC<BuildProgressStepProps> = ({
     };
 
     buildLifemap();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - don't restart build on progress updates
 
   const getPhaseIcon = () => {
     switch (progress.phase) {
