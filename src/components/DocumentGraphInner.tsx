@@ -68,6 +68,7 @@ export function DocumentGraphInner() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
+  const [isDataReady, setIsDataReady] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Wrapper to convert entity ID to Entity for document viewer
@@ -87,19 +88,22 @@ export function DocumentGraphInner() {
   // Check if onboarding is needed (wait for initialization first)
   useEffect(() => {
     const checkOnboarding = async () => {
-      // Wait for data service to finish initializing
-      if (dataService.waitForInitialization) {
-        console.log('Waiting for data service initialization...');
-        await dataService.waitForInitialization();
-        console.log('Data service initialized');
+      // Ensure correct service is used (handles case where auth wasn't ready at module import)
+      // This also waits for initialization to complete
+      if (dataService.ensureCorrectService) {
+        console.log('Ensuring correct data service and waiting for initialization...');
+        await dataService.ensureCorrectService();
+        console.log('Data service ready');
       }
 
       // Now check if onboarding is needed
       if (dataService.needsOnboarding && dataService.needsOnboarding()) {
         console.log('Onboarding needed - showing wizard');
         setShowOnboardingWizard(true);
+        // Don't set isDataReady - we need to wait for onboarding to complete
       } else {
-        console.log('Onboarding not needed - data exists');
+        console.log('Onboarding not needed - data exists, loading graph');
+        setIsDataReady(true);
       }
     };
 
@@ -119,8 +123,9 @@ export function DocumentGraphInner() {
       await dataService.completeOnboarding(familyName);
     }
 
-    // Close wizard
+    // Close wizard and mark data as ready
     setShowOnboardingWizard(false);
+    setIsDataReady(true);
 
     // Reload graph data
     const allNodes = dataService.entitiesToNodes();
@@ -145,8 +150,14 @@ export function DocumentGraphInner() {
     graphData.setNodes(initialVisibleNodes);
   }, [layoutEngine, graphData]);
 
-  // Initialize with data from data service
+  // Initialize with data from data service (only when data is ready)
   useEffect(() => {
+    // Don't load data until service is initialized and onboarding check is complete
+    if (!isDataReady) {
+      console.log('Waiting for data to be ready before loading nodes...');
+      return;
+    }
+
     const allNodes = dataService.entitiesToNodes();
     console.log('Loaded nodes from data service:', allNodes.length);
 
@@ -168,7 +179,7 @@ export function DocumentGraphInner() {
 
     graphData.setNodes(initialVisibleNodes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutEngine]);
+  }, [layoutEngine, isDataReady]);
 
   // Update node expansion state and visibility
   useEffect(() => {

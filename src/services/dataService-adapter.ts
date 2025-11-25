@@ -334,6 +334,27 @@ export class DataService {
     }
     return true; // Non-Google Drive services are always "initialized"
   }
+
+  /**
+   * Reinitialize with GoogleDriveDataService if now authenticated
+   * This handles the case where auth wasn't ready at module import time
+   */
+  async ensureCorrectService(): Promise<void> {
+    // If already using GoogleDriveDataService, just ensure it's initialized
+    if (this.standaloneService instanceof GoogleDriveDataService) {
+      await this.standaloneService.waitForInitialization();
+      return;
+    }
+
+    // If now authenticated but using wrong service, switch to GoogleDriveDataService
+    if (googleAuthService.isAuthenticated()) {
+      console.log('Switching to GoogleDriveDataService (auth was ready after module import)');
+      const googleService = GoogleDriveDataService.getInstance();
+      this.standaloneService = googleService;
+      this.service = googleService;
+      await googleService.initialize();
+    }
+  }
 }
 
 // Export singleton instance for backward compatibility
