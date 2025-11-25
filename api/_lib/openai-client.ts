@@ -143,3 +143,58 @@ Return ONLY a raw JSON object with this structure. Do not include markdown forma
   "reasoning": "Brief explanation of placement decision"
 }`;
 }
+
+/**
+ * Get multi-page document analysis prompt
+ */
+export function getMultipageDocumentAnalysisPrompt(
+  totalPages: number,
+  pageNumbers: number[]
+): string {
+  const pageList = pageNumbers.join(', ');
+
+  return `You are analyzing a MULTI-PAGE document. This document has ${totalPages} pages total, and you are seeing pages: ${pageList}.
+
+IMPORTANT: Synthesize information across ALL provided pages to create a unified analysis.
+
+When analyzing multi-page documents:
+1. Look for document type indicators (headers, titles, logos) - often on page 1
+2. Extract key data from throughout the document
+3. Look for signatures, dates, and totals - often on the last page
+4. For forms/applications: combine data from all visible pages
+5. For statements/reports: look for summary sections
+
+Provide:
+1. A single sentence summary starting with "The" that identifies what this document is and who it belongs to (e.g., "The insurance policy for John Smith")
+
+2. Document type classification (e.g., passport, insurance_auto, insurance_health, medical_record, financial_statement, utility_bill, tax_document, education_certificate, contract, etc.)
+
+3. Extract ALL relevant information from ALL pages. Be comprehensive. Structure as nested JSON appropriate to document type.
+
+4. IMPORTANT: Extract FULL NAMES of all people mentioned in the document as an array. Look for:
+   - Document holder/owner names
+   - Policy holder names
+   - Patient names
+   - Account holder names
+   - Beneficiary names
+   - Family member names
+
+5. Note which page key information came from when relevant.
+
+Return ONLY a raw JSON object with this exact structure. Do not include markdown formatting, code blocks, or any other text:
+{
+  "summary": "The [document type] for [person name]",
+  "documentType": "classification_here",
+  "extractedData": {
+    // Comprehensive nested structure with data from all pages
+  },
+  "confidence": 0-100,
+  "personNames": ["Full Name 1", "Full Name 2"],
+  "pageAnalysis": {
+    "pagesAnalyzed": [${pageList}],
+    "totalPages": ${totalPages},
+    "keyPagesIdentified": [1],
+    "potentialMissingInfo": "Note if important data might be on unanalyzed pages, or null if all key info was found"
+  }
+}`;
+}

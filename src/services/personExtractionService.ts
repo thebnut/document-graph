@@ -1,9 +1,16 @@
 /**
  * Person Extraction Service
  * Extracts person names from document analysis results and filters by family name
+ *
+ * ENHANCED: Now supports direct file extraction via documentAnalysisService
+ * (which handles both images and multi-page PDFs)
  */
 
-import { DocumentAnalysis } from './documentAnalysisService';
+import {
+  DocumentAnalysis,
+  AnalysisError,
+  documentAnalysisService,
+} from './documentAnalysisService';
 
 export interface ExtractedPerson {
   fullName: string;           // "Brett Thebault"
@@ -86,6 +93,47 @@ export class PersonExtractionService {
     }
 
     return people;
+  }
+
+  /**
+   * Extract people directly from a file (image or PDF)
+   * This is a convenience method that handles the full analysis pipeline
+   *
+   * @param file - The file to analyze (image or PDF)
+   * @param familyName - Family name to filter by
+   * @param onProgress - Optional progress callback for PDF processing
+   * @returns Object containing extracted people and the analysis result
+   */
+  async extractPeopleFromFile(
+    file: File,
+    familyName: string,
+    onProgress?: (phase: string, current: number, total: number) => void
+  ): Promise<{
+    people: ExtractedPerson[];
+    analysis: DocumentAnalysis | null;
+    error?: string;
+  }> {
+    // Analyze the document (handles both images and PDFs)
+    const result = await documentAnalysisService.analyzeDocument(file, onProgress);
+
+    // Check for errors
+    if ('error' in result) {
+      return {
+        people: [],
+        analysis: null,
+        error: (result as AnalysisError).error,
+      };
+    }
+
+    const analysis = result as DocumentAnalysis;
+
+    // Extract people from the analysis
+    const people = this.extractPeople(analysis, familyName, file.name);
+
+    return {
+      people,
+      analysis,
+    };
   }
 
   /**

@@ -19,11 +19,17 @@ interface BulkUploadModalProps {
 
 interface UploadedFile {
   file: File;
-  status: 'pending' | 'analyzing' | 'analyzed' | 'placing' | 'complete' | 'error';
+  status: 'pending' | 'rendering' | 'analyzing' | 'analyzed' | 'placing' | 'complete' | 'error';
   analysis?: DocumentAnalysis;
   placement?: PlacementDecision;
   error?: string;
   nodeId?: string;
+  // PDF-specific fields
+  pdfProgress?: {
+    phase: string;
+    current: number;
+    total: number;
+  };
 }
 
 export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
@@ -96,14 +102,29 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
       const uploadedFile = uploadedFiles[i];
       if (uploadedFile.status !== 'pending') continue;
       
-      // Update status to analyzing
-      setUploadedFiles(prev => prev.map((f, idx) => 
-        idx === i ? { ...f, status: 'analyzing' as const } : f
+      // Check if this is a PDF
+      const isPDF = uploadedFile.file.type === 'application/pdf';
+
+      // Update status to analyzing (or rendering for PDFs)
+      setUploadedFiles(prev => prev.map((f, idx) =>
+        idx === i ? { ...f, status: isPDF ? 'rendering' as const : 'analyzing' as const } : f
       ));
-      
+
       try {
-        // Step 1: Analyze the document
-        const analysisResult = await documentAnalysisService.analyzeDocument(uploadedFile.file);
+        // Step 1: Analyze the document (with progress callback for PDFs)
+        const analysisResult = await documentAnalysisService.analyzeDocument(
+          uploadedFile.file,
+          (phase, current, total) => {
+            // Update progress for PDF processing
+            setUploadedFiles(prev => prev.map((f, idx) =>
+              idx === i ? {
+                ...f,
+                status: phase === 'rendering' ? 'rendering' as const : 'analyzing' as const,
+                pdfProgress: { phase, current, total }
+              } : f
+            ));
+          }
+        );
         
         if ('error' in analysisResult) {
           throw new Error(analysisResult.error);
@@ -277,6 +298,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
     switch (status) {
       case 'pending':
         return <FileText className="w-4 h-4 text-gray-400" />;
+      case 'rendering':
       case 'analyzing':
       case 'placing':
         return <Loader className="w-4 h-4 text-blue-500 animate-spin" />;
@@ -288,15 +310,26 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
         return <AlertCircle className="w-4 h-4 text-red-500" />;
     }
   };
-  
+
   const getStatusText = (file: UploadedFile) => {
     switch (file.status) {
       case 'pending':
         return 'Waiting...';
+      case 'rendering':
+        if (file.pdfProgress) {
+          return `Rendering page ${file.pdfProgress.current} of ${file.pdfProgress.total}...`;
+        }
+        return 'Rendering PDF pages...';
       case 'analyzing':
+        if (file.pdfProgress?.phase === 'analyzing') {
+          return `Analyzing ${file.pdfProgress.total} page(s)...`;
+        }
         return 'Analyzing document...';
       case 'analyzed':
-        return `Analyzed: ${file.analysis?.documentType}`;
+        const pageInfo = file.analysis?.pageAnalysis
+          ? ` (${file.analysis.pageAnalysis.pagesAnalyzed.length}/${file.analysis.pageAnalysis.totalPages} pages)`
+          : '';
+        return `Analyzed: ${file.analysis?.documentType}${pageInfo}`;
       case 'placing':
         return 'Determining placement...';
       case 'complete':

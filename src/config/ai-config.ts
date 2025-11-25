@@ -23,9 +23,17 @@ export interface AIConfig {
       low: number;
     };
   };
+  pdfProcessing: {
+    maxPagesPerRequest: number;
+    maxTotalPages: number;
+    targetImageWidth: number;
+    jpegQuality: number;
+    pageSelectionStrategy: 'smart' | 'all' | 'first_only';
+  };
   prompts: {
     documentAnalysis: string;
     documentPlacement: string;
+    multipageDocumentAnalysis: string;
   };
   debug: boolean;
 }
@@ -44,13 +52,20 @@ export const AI_CONFIG: AIConfig = {
       'image/jpeg',
       'image/png',
       'image/webp',
-      // Note: PDFs not supported - OpenAI Vision API only accepts images
+      'application/pdf', // PDFs converted to images via pdfProcessingService
     ],
     confidenceLevels: {
       high: 80,   // Auto-create node
-      medium: 60, // Suggest but require confirmation  
+      medium: 60, // Suggest but require confirmation
       low: 0      // Manual review required
     }
+  },
+  pdfProcessing: {
+    maxPagesPerRequest: 8,     // Max pages to send in single API request
+    maxTotalPages: 20,         // Hard limit - reject PDFs with more pages
+    targetImageWidth: 1200,    // Target width for page images (px)
+    jpegQuality: 0.85,         // JPEG quality (0-1)
+    pageSelectionStrategy: 'smart' // 'smart' | 'all' | 'first_only'
   },
   prompts: {
     documentAnalysis: `Analyze this document image/PDF and provide:
@@ -100,6 +115,42 @@ Return ONLY a raw JSON object with this structure. Do not include markdown forma
   "suggestedPath": ["Person Name", "Category", "Subcategory"],
   "confidence": 0-100,
   "reasoning": "Brief explanation of placement decision"
+}`,
+    multipageDocumentAnalysis: `You are analyzing a MULTI-PAGE document. This document has {totalPages} pages total, and you are seeing pages {pageNumbers}.
+
+IMPORTANT: Synthesize information across ALL provided pages to create a unified analysis.
+
+When analyzing multi-page documents:
+1. Look for document type indicators (headers, titles, logos) - often on page 1
+2. Extract key data from throughout the document
+3. Look for signatures, dates, and totals - often on the last page
+4. For forms/applications: combine data from all visible pages
+5. For statements/reports: look for summary sections
+
+Provide:
+1. A single sentence summary starting with "The" that identifies what this document is and who it belongs to
+
+2. Document type classification (e.g., passport, insurance_auto, insurance_health, medical_record, financial_statement, utility_bill, tax_document, education_certificate, contract, etc.)
+
+3. Extract ALL relevant information from ALL pages. Be comprehensive. Structure as nested JSON appropriate to document type.
+
+4. Note which page key information came from when relevant.
+
+Return ONLY a raw JSON object with this exact structure. Do not include markdown formatting, code blocks, or any other text:
+{
+  "summary": "The [document type] for [person name]",
+  "documentType": "classification_here",
+  "extractedData": {
+    // Comprehensive nested structure with data from all pages
+  },
+  "confidence": 0-100,
+  "personNames": ["Name1", "Name2"],
+  "pageAnalysis": {
+    "pagesAnalyzed": [1, 5, 10],
+    "totalPages": 10,
+    "keyPagesIdentified": [1, 10],
+    "potentialMissingInfo": "Note if important data might be on unanalyzed pages"
+  }
 }`
   },
   debug: true // Enable debugging by default

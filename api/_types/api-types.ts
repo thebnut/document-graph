@@ -27,6 +27,39 @@ export interface AnalyzeDocumentResponse {
 }
 
 // ============================================================================
+// Multi-Page Document Analysis Types
+// ============================================================================
+
+export interface PageImage {
+  pageNumber: number;
+  image: string;        // base64-encoded image content
+  mimeType: string;     // e.g., "image/jpeg"
+}
+
+export interface AnalyzeMultipageRequest {
+  pages: PageImage[];
+  fileName: string;
+  totalPageCount: number;
+  analyzedPageNumbers: number[];
+}
+
+export interface MultipageDocumentAnalysis extends DocumentAnalysis {
+  personNames?: string[];
+  pageAnalysis?: {
+    pagesAnalyzed: number[];
+    totalPages: number;
+    keyPagesIdentified?: number[];
+    potentialMissingInfo?: string;
+  };
+}
+
+export interface AnalyzeMultipageResponse {
+  success: boolean;
+  data?: MultipageDocumentAnalysis;
+  error?: string;
+}
+
+// ============================================================================
 // Document Placement Types
 // ============================================================================
 

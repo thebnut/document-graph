@@ -93,14 +93,16 @@ export class LifemapBuilderService {
 
       const documentsWithAnalysis = await this.analyzeDocuments(
         files,
-        (processed, fileName) => {
+        (processed, fileName, detail) => {
           progressCallback({
             phase: 'analyzing',
             filesProcessed: processed,
             totalFiles: files.length,
             peopleFound: [],
             nodesCreated: 0,
-            currentOperation: `Analyzing ${fileName}...`,
+            currentOperation: detail
+              ? `${fileName}: ${detail}`
+              : `Analyzing ${fileName}...`,
           });
         }
       );
@@ -258,16 +260,27 @@ export class LifemapBuilderService {
    */
   private async analyzeDocuments(
     files: File[],
-    progressCallback: (processed: number, fileName: string) => void
+    progressCallback: (processed: number, fileName: string, detail?: string) => void
   ): Promise<DocumentWithAnalysis[]> {
     const results: DocumentWithAnalysis[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      progressCallback(i + 1, file.name);
+      const isPDF = file.type === 'application/pdf';
+      progressCallback(i + 1, file.name, isPDF ? 'Loading PDF...' : undefined);
 
       try {
-        const analysis = await documentAnalysisService.analyzeDocument(file);
+        // Pass progress callback for PDF processing
+        const analysis = await documentAnalysisService.analyzeDocument(
+          file,
+          (phase, current, total) => {
+            if (phase === 'rendering') {
+              progressCallback(i + 1, file.name, `Rendering page ${current}/${total}...`);
+            } else if (phase === 'analyzing') {
+              progressCallback(i + 1, file.name, `Analyzing ${total} page(s)...`);
+            }
+          }
+        );
 
         if ('error' in analysis) {
           results.push({

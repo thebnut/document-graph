@@ -4,18 +4,31 @@
  *
  * REFACTORED: Now uses serverless API endpoints instead of direct OpenAI calls
  * for improved security (API key is server-side only)
+ *
+ * ENHANCED: Added multi-page PDF support via pdfProcessingService
  */
 
 import { AI_CONFIG } from '../config/ai-config';
 import * as apiClient from './apiClient';
 import { APIClientError } from './apiClient';
+import {
+  pdfProcessingService,
+  isPDFProcessingError,
+  type PDFProcessingResult,
+} from './pdfProcessingService';
 
 export interface DocumentAnalysis {
   summary: string; // Single sentence starting with "The"
   documentType: string; // passport, insurance, medical, etc.
   extractedData: Record<string, any>; // Flexible JSON with all extracted info
   confidence: number; // 0-100
-  personNames?: string[]; // NEW: Explicit person names extracted from document
+  personNames?: string[]; // Explicit person names extracted from document
+  pageAnalysis?: {
+    pagesAnalyzed: number[];
+    totalPages: number;
+    keyPagesIdentified?: number[];
+    potentialMissingInfo?: string;
+  };
 }
 
 export interface AnalysisError {
@@ -47,9 +60,14 @@ export class DocumentAnalysisService {
   
   /**
    * Analyze a document using multimodal LLM
-   * NOW USES: Serverless API endpoint (/api/analyze-document)
+   * NOW USES: Serverless API endpoints
+   * - Single images: /api/analyze-document
+   * - PDFs (multi-page): /api/analyze-document-multipage
    */
-  async analyzeDocument(file: File): Promise<DocumentAnalysis | AnalysisError> {
+  async analyzeDocument(
+    file: File,
+    onProgress?: (phase: string, current: number, total: number) => void
+  ): Promise<DocumentAnalysis | AnalysisError> {
     try {
       // Validate file
       if (!this.isFileSupported(file)) {
@@ -72,11 +90,21 @@ export class DocumentAnalysisService {
         });
       }
 
+      // Check if PDF - route through multi-page processing
+      if (pdfProcessingService.isPDF(file)) {
+        return this.analyzePDFDocument(file, onProgress);
+      }
+
+      // Standard image analysis
+      onProgress?.('analyzing', 0, 1);
+
       // Call serverless API endpoint
       const analysis = await apiClient.analyzeDocument(file);
 
       // Ensure confidence is within 0-100
       analysis.confidence = Math.max(0, Math.min(100, analysis.confidence || 0));
+
+      onProgress?.('complete', 1, 1);
 
       if (AI_CONFIG.debug) {
         console.log('Document Analysis - Success:', analysis);
@@ -107,6 +135,68 @@ export class DocumentAnalysisService {
 
       return { error: 'Unknown error during document analysis' };
     }
+  }
+
+  /**
+   * Analyze a PDF document with multi-page support
+   * Converts PDF pages to images, then sends to multi-page analysis endpoint
+   */
+  private async analyzePDFDocument(
+    file: File,
+    onProgress?: (phase: string, current: number, total: number) => void
+  ): Promise<DocumentAnalysis | AnalysisError> {
+    if (AI_CONFIG.debug) {
+      console.log('Document Analysis - Processing PDF:', file.name);
+    }
+
+    // Process PDF to images
+    const pdfResult = await pdfProcessingService.processPDF(file, {
+      onProgress: (phase, current, total) => {
+        if (phase === 'rendering') {
+          onProgress?.('rendering', current, total);
+        }
+      },
+    });
+
+    // Check for PDF processing errors
+    if (isPDFProcessingError(pdfResult)) {
+      return { error: pdfResult.error, details: { code: pdfResult.code } };
+    }
+
+    const result = pdfResult as PDFProcessingResult;
+
+    if (AI_CONFIG.debug) {
+      console.log('Document Analysis - PDF processed:', {
+        totalPages: result.pageCount,
+        analyzedPages: result.selectedPageNumbers,
+        metadata: result.metadata,
+      });
+    }
+
+    onProgress?.('analyzing', 0, result.pages.length);
+
+    // Call multi-page analysis endpoint
+    const analysis = await apiClient.analyzeDocumentMultipage(
+      result.pages,
+      file.name,
+      result.pageCount
+    );
+
+    // Ensure confidence is within 0-100
+    analysis.confidence = Math.max(0, Math.min(100, analysis.confidence || 0));
+
+    onProgress?.('complete', result.pages.length, result.pages.length);
+
+    if (AI_CONFIG.debug) {
+      console.log('Document Analysis - PDF Success:', {
+        documentType: analysis.documentType,
+        confidence: analysis.confidence,
+        personNames: analysis.personNames,
+        pageAnalysis: analysis.pageAnalysis,
+      });
+    }
+
+    return analysis;
   }
   
   /**

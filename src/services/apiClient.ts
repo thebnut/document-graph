@@ -8,11 +8,16 @@
 import type {
   AnalyzeDocumentRequest,
   AnalyzeDocumentResponse,
+  AnalyzeMultipageRequest,
+  AnalyzeMultipageResponse,
   DeterminePlacementRequest,
   DeterminePlacementResponse,
   DocumentAnalysis,
+  MultipageDocumentAnalysis,
+  PageImage,
   PlacementDecision,
 } from '../../api/_types/api-types';
+import type { PDFPageImage } from './pdfProcessingService';
 
 // API endpoint configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
@@ -112,6 +117,52 @@ export async function analyzeDocument(file: File): Promise<DocumentAnalysis> {
 }
 
 /**
+ * Analyze a multi-page document using OpenAI Vision API
+ *
+ * @param pages - Array of page images (from pdfProcessingService)
+ * @param fileName - Original file name
+ * @param totalPageCount - Total pages in original document
+ * @returns Multi-page document analysis result
+ */
+export async function analyzeDocumentMultipage(
+  pages: PDFPageImage[],
+  fileName: string,
+  totalPageCount: number
+): Promise<MultipageDocumentAnalysis> {
+  // Convert PDFPageImage to PageImage format for API
+  const apiPages: PageImage[] = pages.map((page) => ({
+    pageNumber: page.pageNumber,
+    image: page.base64,
+    mimeType: 'image/jpeg', // pdfProcessingService outputs JPEG
+  }));
+
+  // Prepare request
+  const request: AnalyzeMultipageRequest = {
+    pages: apiPages,
+    fileName,
+    totalPageCount,
+    analyzedPageNumbers: pages.map((p) => p.pageNumber),
+  };
+
+  // Call API
+  const response = await post<AnalyzeMultipageRequest, AnalyzeMultipageResponse>(
+    'analyze-document-multipage',
+    request
+  );
+
+  // Check response
+  if (!response.success || !response.data) {
+    throw new APIClientError(
+      response.error || 'Multi-page document analysis failed',
+      undefined,
+      response
+    );
+  }
+
+  return response.data;
+}
+
+/**
  * Determine optimal placement for a document in the tree
  *
  * @param analysis - The document analysis result
@@ -183,11 +234,21 @@ export function isFileSupported(file: File): boolean {
     'image/jpg',
     'image/png',
     'image/webp',
-    // Note: PDFs not supported - OpenAI Vision API only accepts images
+    'application/pdf', // PDFs converted to images via pdfProcessingService
   ];
 
   return supportedTypes.includes(file.type.toLowerCase());
 }
 
+/**
+ * Check if a file is a PDF
+ *
+ * @param file - The file to check
+ * @returns true if PDF, false otherwise
+ */
+export function isPDF(file: File): boolean {
+  return file.type.toLowerCase() === 'application/pdf';
+}
+
 // Export types for convenience
-export type { DocumentAnalysis, PlacementDecision };
+export type { DocumentAnalysis, MultipageDocumentAnalysis, PlacementDecision };
